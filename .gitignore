@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .venv/
+*.egg-info/
 
 # Local configuration
 .env
@@ -20,4 +21,3 @@ models/
 .idea/
 .DS_Store
 Thumbs.db
-
