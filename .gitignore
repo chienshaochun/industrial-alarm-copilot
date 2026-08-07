@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+# Local configuration
+.env
+.env.*
+!.env.example
+
+# Generated data and models
+data/processed/*
+!data/processed/.gitkeep
+artifacts/
+models/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
