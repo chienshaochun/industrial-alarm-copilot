@@ -1,33 +1,23 @@
-# Project Plan
+# 專案計畫
 
-The Industrial Alarm Copilot project is divided into eight independently
-verifiable stages. Each stage should finish with tests or other validation and
-one focused Git commit.
+Industrial Alarm Copilot 分成八個可獨立驗證的階段。每個階段都應完成測試或其他驗證，並建立一筆主題明確的 Git commit。
 
-## Stages
+## 專案階段
 
-1. **Repository and dataset foundation** — initialize the repository, include
-   the ALPI raw dataset, and document provenance and licensing. **Complete.**
-2. **Product and technical design** — define the target user, MVP workflow,
-   architecture, non-goals, and acceptance criteria.
-3. **Data analysis and pipeline** — profile and validate the dataset, prevent
-   temporal leakage, and build reproducible preprocessing.
-4. **Incident-analysis baseline** — group related alarm events into windows and
-   implement deterministic statistical baselines.
-5. **Similar-episode retrieval** — retrieve historical alarm windows, cite the
-   evidence, and measure retrieval quality.
-6. **Next-alarm forecasting** — train baseline forecasting models and evaluate
-   common and rare alarms separately.
-7. **AI copilot and web application** — add evidence-constrained summaries and
-   an interactive Streamlit interface.
-8. **Engineering and portfolio delivery** — add automated tests, CI, Docker,
-   deployment instructions, screenshots, and a short product demo.
+1. **Repository 與資料準備**：初始化 Repository、納入 ALPI 原始資料，並記錄資料來源與授權。**已完成。**
+2. **產品需求與技術設計**：定義目標使用者、MVP 操作流程、架構、非目標與驗收條件。
+3. **資料分析與處理管線**：分析並驗證資料集、防止時間洩漏，並建立可重現的前處理流程。
+4. **事件分析基線**：將時間上相關的警報組成事件時間窗，並建立可重現的統計基線。
+5. **相似事件檢索**：檢索歷史警報事件、引用證據，並量化檢索品質。
+6. **後續警報預測**：訓練基線預測模型，並分別評估常見與罕見警報。
+7. **AI Copilot 與 Web 應用**：加入受證據約束的摘要，以及互動式 Streamlit 介面。
+8. **工程化與履歷交付**：加入自動化測試、CI、Docker、部署說明、畫面截圖與短篇產品展示影片。
 
-## Delivery rules
+## 交付原則
 
-- Use chronological splits for time-dependent evaluation.
-- Keep observed facts, model predictions, and generated summaries distinct.
-- Establish deterministic baselines before adding an LLM.
-- Cite retrieved historical episodes in user-facing AI summaries.
-- Complete validation and a focused commit before starting the next stage.
+- 時間相關的評估必須採用時間順序切分。
+- 明確區分觀察到的事實、模型預測與 AI 產生的摘要。
+- 串接 LLM 前，先建立 deterministic baseline。
+- 面向使用者的 AI 摘要必須引用檢索到的歷史事件。
+- 每個階段都要完成驗證與一筆主題明確的 commit，才能進入下一階段。
 
