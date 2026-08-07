@@ -1,45 +1,41 @@
-# Data
+# 資料說明
 
-## Source
+## 資料來源
 
-This project uses version 1 of the Alarm Logs in Packaging Industry (ALPI)
-dataset:
+本專案使用 Alarm Logs in Packaging Industry（ALPI）version 1：
 
 > Dalle Pezze, Davide; Tosato, Diego; Masiero, Chiara; Susto, Gian
 > Antonio; Beghi, Alessandro (2021), "ALARM LOGS IN PACKAGING INDUSTRY
 > (ALPI)", Mendeley Data, V1, doi: 10.17632/4nhx2x67cd.1.
 
-- Record: https://data.mendeley.com/datasets/4nhx2x67cd/1
-- DOI: https://doi.org/10.17632/4nhx2x67cd.1
-- License: CC BY 4.0
-- Downloaded: 2026-08-07
+- 資料集頁面：https://data.mendeley.com/datasets/4nhx2x67cd/1
+- DOI：https://doi.org/10.17632/4nhx2x67cd.1
+- 授權：CC BY 4.0
+- 下載日期：2026-08-07
 
-## Included files
+## 納入的檔案
 
-- `raw/alarms.csv`: original event-level alarm log extracted without changes
-- `original/alpi-v1/dataset.py`: publisher-provided preprocessing code
-- `original/alpi-v1/readme.md`: publisher-provided dataset documentation
-- `processed/`: local generated derivatives; ignored by Git
+- `raw/alarms.csv`：未修改的原始事件層級警報紀錄
+- `original/alpi-v1/dataset.py`：發布者提供的資料前處理程式
+- `original/alpi-v1/readme.md`：發布者提供的資料集說明
+- `processed/`：本機產生的衍生資料，不納入 Git
 
-The publisher's precomputed JSON, NumPy, and pickle derivatives are not
-included because they duplicate the raw data and can be regenerated with the
-provided preprocessing script.
+發布者預先產生的 JSON、NumPy 與 pickle 檔案未納入本專案，因為它們與原始資料重複，並可使用發布者提供的程式重新產生。
 
-## Raw schema
+## 原始資料欄位
 
-| Column | Meaning |
+| 欄位 | 說明 |
 | --- | --- |
-| `timestamp` | Alarm occurrence time |
-| `alarm` | Anonymized alarm code |
-| `serial` | Anonymized machine identifier |
+| `timestamp` | 警報發生時間 |
+| `alarm` | 匿名化的警報代碼 |
+| `serial` | 匿名化的設備識別碼 |
 
-## Integrity
+## 完整性驗證
 
-`raw/alarms.csv` SHA-256:
+`raw/alarms.csv` SHA-256：
 
 ```text
 53bd4414a6fb5b6875a9535f1be622dfb2dfba69de407d071a52d0d304160d1a
 ```
 
-The dataset is third-party content and is not relicensed under the project's
-MIT License. See the repository-level `NOTICE.md`.
+此資料集屬於第三方內容，不會重新授權為本專案的 MIT License。詳細界線請參閱 Repository 根目錄的 `NOTICE.md`。
