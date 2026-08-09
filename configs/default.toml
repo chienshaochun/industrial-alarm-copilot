@@ -1,0 +1,3 @@
+[incidents]
+gap_minutes = 30
+sensitivity_gap_minutes = [15, 30, 60]
