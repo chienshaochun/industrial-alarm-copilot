@@ -2,6 +2,8 @@
 
 import pandas as pd
 
+from industrial_alarm_copilot.incidents.identifiers import build_incident_id
+
 
 def mark_incident_starts(
     events: pd.DataFrame,
@@ -44,3 +46,31 @@ def assign_incident_numbers(
         numbered_events['is_incident_start'].cumsum().sub(1).astype('int64')
     )
     return numbered_events
+
+
+def assign_incident_ids(
+    events: pd.DataFrame,
+    gap_minutes: float = 30.0,
+) -> pd.DataFrame:
+    '''Assign one stable incident ID to every event in an episode.'''
+    identified_events = assign_incident_numbers(
+        events,
+        gap_minutes=gap_minutes,
+    )
+    episode_starts = identified_events.loc[
+        identified_events['is_incident_start']
+    ]
+    id_by_number = {
+        int(row.incident_number): build_incident_id(
+            machine_id=row.machine_id,
+            split=row.split,
+            start_time=row.timestamp,
+            first_source_row=row.source_row,
+            gap_minutes=gap_minutes,
+        )
+        for row in episode_starts.itertuples(index=False)
+    }
+    identified_events['incident_id'] = (
+        identified_events['incident_number'].map(id_by_number).astype('string')
+    )
+    return identified_events
