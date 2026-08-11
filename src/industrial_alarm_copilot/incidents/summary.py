@@ -5,7 +5,7 @@ import pandas as pd
 from industrial_alarm_copilot.incidents.builder import assign_incident_ids
 
 
-TEMPORAL_SUMMARY_COLUMNS = [
+INCIDENT_SUMMARY_COLUMNS = [
     'incident_id',
     'machine_id',
     'split',
@@ -13,7 +13,20 @@ TEMPORAL_SUMMARY_COLUMNS = [
     'end_time',
     'duration_seconds',
     'event_count',
+    'distinct_alarm_count',
+    'first_alarm_code',
+    'last_alarm_code',
+    'dominant_alarm_code',
+    'duplicate_event_count',
 ]
+
+
+def _select_dominant_alarm(alarm_codes: pd.Series) -> str:
+    '''Select the most frequent code with a deterministic string tie-break.'''
+    alarm_counts = alarm_codes.astype('string').value_counts(sort=False)
+    highest_count = alarm_counts.max()
+    tied_codes = alarm_counts.index[alarm_counts.eq(highest_count)]
+    return min(str(code) for code in tied_codes)
 
 
 def build_incident_summary(
@@ -37,9 +50,17 @@ def build_incident_summary(
         start_time=('timestamp', 'first'),
         end_time=('timestamp', 'last'),
         event_count=('source_row', 'size'),
+        distinct_alarm_count=('alarm_code', 'nunique'),
+        first_alarm_code=('alarm_code', 'first'),
+        last_alarm_code=('alarm_code', 'last'),
+        dominant_alarm_code=('alarm_code', _select_dominant_alarm),
+        duplicate_event_count=('is_exact_duplicate', 'sum'),
     ).reset_index(drop=True)
     summary['duration_seconds'] = (
         summary['end_time'] - summary['start_time']
     ).dt.total_seconds()
+    summary['duplicate_event_count'] = summary[
+        'duplicate_event_count'
+    ].astype('int64')
 
-    return summary[TEMPORAL_SUMMARY_COLUMNS]
+    return summary[INCIDENT_SUMMARY_COLUMNS]
