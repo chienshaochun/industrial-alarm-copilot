@@ -7,7 +7,16 @@
 
 ## 目前進度
 
-Repository 與資料集初始化已完成，目前正在進行產品需求與技術設計。
+第 1 至第 3 階段已完成本機驗收：Repository 與資料集準備、產品與技術設計，以及可重現的資料分析與處理管線。下一階段將使用 30 分鐘 incident gap 建立警報事件時間窗與統計 baseline。
+
+目前已實作：
+
+- 嚴格驗證 ALPI 欄位、缺值、timestamp 與識別碼；
+- 保留原始列追溯資訊與完全重複事件標記；
+- 在同一設備內計算相鄰警報時間間隔；
+- 每台設備分開執行 70%／15%／15% chronological split；
+- 產生 Zstandard 壓縮的 `events.parquet` 與可追溯 metadata；
+- 以完整 444,834 筆 ALPI 資料執行自動化契約驗收。
 
 ## 資料集摘要
 
@@ -24,6 +33,48 @@ Repository 與資料集初始化已完成，目前正在進行產品需求與技
 
 這些資料是真實工業設備產生的警報序列，警報類別分布高度不平衡，適合用來實作時間序列驗證、罕見警報評估、多標籤預測與跨設備泛化實驗。
 
+## 快速開始
+
+本專案使用 Python 3.12。第一次建立環境：
+
+```powershell
+conda create --name industrial-alarm-copilot python=3.12
+conda activate industrial-alarm-copilot
+python -m pip install --editable ".[dev]"
+```
+
+執行所有單元與整合測試：
+
+```powershell
+python -m pytest
+```
+
+由原始 CSV 重新產生 processed artifacts：
+
+```powershell
+python -m industrial_alarm_copilot prepare-data
+```
+
+預設輸出：
+
+```text
+data/processed/events.parquet
+data/processed/events.metadata.json
+```
+
+衍生 artifacts 不納入 Git。metadata 會記錄原始 CSV SHA-256、pipeline 設定、產生時間、Git commit、欄位型別及 split 時間邊界。
+
+## 第 3 階段主要發現
+
+- 警報分布高度不平衡：最常見代碼占 20.40%，前十種占 88.75%；
+- 前五台設備占 53.75% 的事件，原始事件量不能直接解讀為故障率；
+- 83 個完全相同事件群組涉及 166 列，完整事件視圖全部保留；
+- 同設備相鄰警報的中位 gap 為 0.98 分鐘，90% 分位數為 25.36 分鐘；
+- 第一版 incident gap 設為 30 分鐘，並保留 15／30／60 分鐘敏感度比較；
+- processed events 共 444,834 列、9 欄，本次產生的 Parquet 約 9.34 MiB。
+
+時間範圍、事件數與 gap 都只描述警報記錄，不能直接視為設備運轉、停機、故障持續或修復時間。
+
 ## 預計實作範圍
 
 1. 探索警報時間軸與各設備的資料分布。
@@ -39,15 +90,32 @@ Repository 與資料集初始化已完成，目前正在進行產品需求與技
 
 ```text
 industrial-alarm-copilot/
+|-- configs/default.toml   # incident gap 與 split 設定
 |-- data/
-|   |-- original/alpi-v1/  # 發布者的 README 與前處理程式
-|   |-- processed/         # 本機產生的衍生資料，不納入 Git
+|   |-- original/alpi-v1/  # 發布者原始文件與前處理程式，不修改
+|   |-- processed/         # 本機衍生 artifacts，不納入 Git
 |   `-- raw/alarms.csv     # 原始 ALPI 警報事件
-|-- docs/                  # 產品規格與專案計畫
+|-- docs/                  # 規格、設計、EDA 與分析決策
+|-- src/industrial_alarm_copilot/
+|   `-- data/              # loader、validation、EDA、gap、split、pipeline
+|-- tests/
+|   |-- unit/
+|   `-- integration/
+|-- pyproject.toml         # Python 依賴與 pytest 設定
 |-- LICENSE                # 專案自行開發內容的 MIT License
 |-- NOTICE.md              # 第三方資料來源與授權界線
 `-- README.md
 ```
+
+## 專案文件
+
+- [產品規格](docs/PRODUCT_SPEC.md)
+- [技術設計](docs/TECHNICAL_DESIGN.md)
+- [資料契約](docs/DATA_CONTRACT.md)
+- [探索性資料分析](docs/EDA_REPORT.md)
+- [Incident gap 分析](docs/INCIDENT_GAP_ANALYSIS.md)
+- [時間序列切分策略](docs/SPLIT_STRATEGY.md)
+- [第 3 階段驗收](docs/STAGE_3_ACCEPTANCE.md)
 
 ## 資料集引用
 

@@ -1,0 +1,9 @@
+[incidents]
+gap_minutes = 30
+sensitivity_gap_minutes = [15, 30, 60]
+
+[split]
+strategy = "per_machine_unique_timestamp"
+train_ratio = 0.70
+validation_ratio = 0.15
+test_ratio = 0.15
