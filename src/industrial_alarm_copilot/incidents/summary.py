@@ -3,12 +3,16 @@
 import pandas as pd
 
 from industrial_alarm_copilot.incidents.builder import assign_incident_ids
+from industrial_alarm_copilot.incidents.identifiers import INCIDENT_SOURCE
 
 
 INCIDENT_SUMMARY_COLUMNS = [
     'incident_id',
     'machine_id',
     'split',
+    'incident_source',
+    'is_ground_truth',
+    'gap_minutes',
     'start_time',
     'end_time',
     'duration_seconds',
@@ -59,6 +63,9 @@ def build_incident_summary(
     summary['duration_seconds'] = (
         summary['end_time'] - summary['start_time']
     ).dt.total_seconds()
+    summary['incident_source'] = INCIDENT_SOURCE
+    summary['is_ground_truth'] = False
+    summary['gap_minutes'] = float(gap_minutes)
     summary['duplicate_event_count'] = summary[
         'duplicate_event_count'
     ].astype('int64')

@@ -28,7 +28,27 @@ def test_build_incident_summary_calculates_episode_time_span_and_size():
 
     summary = build_incident_summary(events, gap_minutes=30)
 
+    assert summary.columns.tolist() == [
+        'incident_id',
+        'machine_id',
+        'split',
+        'incident_source',
+        'is_ground_truth',
+        'gap_minutes',
+        'start_time',
+        'end_time',
+        'duration_seconds',
+        'event_count',
+        'distinct_alarm_count',
+        'first_alarm_code',
+        'last_alarm_code',
+        'dominant_alarm_code',
+        'duplicate_event_count',
+    ]
     assert summary['machine_id'].tolist() == ['4', '4', '6']
+    assert summary['incident_source'].eq('time_gap_heuristic').all()
+    assert summary['is_ground_truth'].eq(False).all()
+    assert summary['gap_minutes'].eq(30.0).all()
     assert summary['event_count'].tolist() == [3, 1, 1]
     assert summary['duration_seconds'].tolist() == [3000.0, 0.0, 0.0]
     assert summary.loc[0, 'start_time'] == pd.Timestamp(
