@@ -1,0 +1,63 @@
+"""Industrial Alarm Copilot 命令列入口。"""
+
+import argparse
+from collections.abc import Sequence
+from pathlib import Path
+
+from industrial_alarm_copilot.data.pipeline import prepare_data_artifacts
+from industrial_alarm_copilot.data.runtime import (
+    get_git_commit,
+    load_pipeline_settings,
+)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """建立命令列參數解析器。"""
+    parser = argparse.ArgumentParser(prog="industrial-alarm-copilot")
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    prepare_data = commands.add_parser(
+        "prepare-data",
+        help="由 ALPI raw CSV 產生 processed events artifacts",
+    )
+    prepare_data.add_argument(
+        "--raw-csv",
+        type=Path,
+        default=Path("data/raw/alarms.csv"),
+    )
+    prepare_data.add_argument(
+        "--config",
+        type=Path,
+        default=Path("configs/default.toml"),
+    )
+    prepare_data.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("data/processed"),
+    )
+
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """執行 Industrial Alarm Copilot CLI。"""
+    args = build_parser().parse_args(argv)
+
+    if args.command == "prepare-data":
+        settings = load_pipeline_settings(args.config)
+        code_version = get_git_commit(Path.cwd())
+        artifact_paths = prepare_data_artifacts(
+            raw_csv_path=args.raw_csv,
+            output_dir=args.output_dir,
+            pipeline_settings=settings,
+            code_version=code_version,
+        )
+        print(f"events artifact: {artifact_paths.events_parquet}")
+        print(f"metadata artifact: {artifact_paths.metadata_json}")
+        print(f"code version: {code_version}")
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
