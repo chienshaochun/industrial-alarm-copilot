@@ -32,3 +32,15 @@ def mark_incident_starts(
         first_for_machine | split_changed | gap_exceeded.fillna(False)
     )
     return marked_events
+
+
+def assign_incident_numbers(
+    events: pd.DataFrame,
+    gap_minutes: float = 30.0,
+) -> pd.DataFrame:
+    '''Assign a zero-based number to each derived alarm episode.'''
+    numbered_events = mark_incident_starts(events, gap_minutes=gap_minutes)
+    numbered_events['incident_number'] = (
+        numbered_events['is_incident_start'].cumsum().sub(1).astype('int64')
+    )
+    return numbered_events

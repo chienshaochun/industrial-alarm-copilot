@@ -2,7 +2,10 @@
 
 import pandas as pd
 
-from industrial_alarm_copilot.incidents.builder import mark_incident_starts
+from industrial_alarm_copilot.incidents.builder import (
+    assign_incident_numbers,
+    mark_incident_starts,
+)
 
 
 def test_mark_incident_starts_respects_gap_split_and_machine_boundaries():
@@ -54,3 +57,26 @@ def test_mark_incident_starts_respects_gap_split_and_machine_boundaries():
         False,
         True,
     ]
+
+
+def test_assign_incident_numbers_increments_only_at_episode_starts():
+    events = pd.DataFrame(
+        {
+            'timestamp': pd.to_datetime(
+                [
+                    '2019-01-01 10:00:00',
+                    '2019-01-01 10:05:00',
+                    '2019-01-01 10:35:01',
+                    '2019-01-01 10:36:00',
+                ]
+            ),
+            'machine_id': ['4', '4', '4', '6'],
+            'source_row': [0, 1, 2, 3],
+            'split': ['train', 'train', 'train', 'train'],
+            'gap_seconds': [float('nan'), 300.0, 1801.0, float('nan')],
+        }
+    )
+
+    result = assign_incident_numbers(events, gap_minutes=30)
+
+    assert result['incident_number'].tolist() == [0, 0, 1, 2]
