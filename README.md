@@ -7,7 +7,7 @@
 
 ## 目前進度
 
-第 1 至第 3 階段已完成本機驗收：Repository 與資料集準備、產品與技術設計，以及可重現的資料分析與處理管線。下一階段將使用 30 分鐘 incident gap 建立警報事件時間窗與統計 baseline。
+第 1 至第 4 階段已完成本機驗收：Repository 與資料集準備、產品與技術設計、可重現的資料處理管線，以及 derived alarm episode 與 deterministic statistical baseline。下一階段將建立時間安全的相似歷史事件檢索。
 
 目前已實作：
 
@@ -16,7 +16,11 @@
 - 在同一設備內計算相鄰警報時間間隔；
 - 每台設備分開執行 70%／15%／15% chronological split；
 - 產生 Zstandard 壓縮的 `events.parquet` 與可追溯 metadata；
-- 以完整 444,834 筆 ALPI 資料執行自動化契約驗收。
+- 以 30 分鐘 gap 將 444,834 筆 events 建立為 38,153 個 derived episodes；
+- 產生穩定 incident ID、event mapping、episode 時間與 alarm 組成摘要；
+- 以 train-only global／machine P95 建立三種 upper-tail flags；
+- 設備歷史不足時使用全域 fallback，避免不穩定的專屬門檻；
+- 以 48 項測試驗收完整 ALPI incident 分析流程。
 
 ## 資料集摘要
 
@@ -62,7 +66,17 @@ data/processed/events.parquet
 data/processed/events.metadata.json
 ```
 
-衍生 artifacts 不納入 Git。metadata 會記錄原始 CSV SHA-256、pipeline 設定、產生時間、Git commit、欄位型別及 split 時間邊界。
+再由 processed events 建立 episode 與 baseline artifacts：
+
+    python -m industrial_alarm_copilot prepare-incidents
+
+額外輸出：
+
+    data/processed/incidents.parquet
+    data/processed/incident_events.parquet
+    data/processed/incident_baselines.json
+
+衍生 artifacts 不納入 Git。metadata 會記錄來源 SHA-256、pipeline 設定、產生時間、Git commit、欄位型別、split 統計與 baseline 門檻。
 
 ## 第 3 階段主要發現
 
@@ -74,6 +88,17 @@ data/processed/events.metadata.json
 - processed events 共 444,834 列、9 欄，本次產生的 Parquet 約 9.34 MiB。
 
 時間範圍、事件數與 gap 都只描述警報記錄，不能直接視為設備運轉、停機、故障持續或修復時間。
+
+## 第 4 階段主要結果
+
+- 30 分鐘正式設定產生 38,153 個 derived episodes；
+- train／validation／test 分別為 25,936／5,853／6,364 個 episodes；
+- 15／30／60 分鐘敏感度分析分別產生 68,093／38,153／19,039 個 episodes；
+- 全域 train P95 為 42 筆 events、9,040.763 秒跨度與 6 種 alarm codes；
+- 19 台設備使用專屬 train baseline，設備 19 因只有 11 個 train episodes 而使用全域 fallback；
+- 任一 upper-tail flag 比例為 train 7.90%、validation 7.47%、test 6.82%。
+
+Derived episode 與 upper-tail flag 都是統計分析單位，不是真實故障、危險或維修標籤。
 
 ## 預計實作範圍
 
@@ -90,13 +115,14 @@ data/processed/events.metadata.json
 
 ```text
 industrial-alarm-copilot/
-|-- configs/default.toml   # incident gap 與 split 設定
+|-- configs/default.toml   # incident gap、baseline 與 split 設定
 |-- data/
 |   |-- original/alpi-v1/  # 發布者原始文件與前處理程式，不修改
 |   |-- processed/         # 本機衍生 artifacts，不納入 Git
 |   `-- raw/alarms.csv     # 原始 ALPI 警報事件
 |-- docs/                  # 規格、設計、EDA 與分析決策
 |-- src/industrial_alarm_copilot/
+|   |-- incidents/         # episode、mapping、baseline 與 artifact pipeline
 |   `-- data/              # loader、validation、EDA、gap、split、pipeline
 |-- tests/
 |   |-- unit/
@@ -116,6 +142,10 @@ industrial-alarm-copilot/
 - [Incident gap 分析](docs/INCIDENT_GAP_ANALYSIS.md)
 - [時間序列切分策略](docs/SPLIT_STRATEGY.md)
 - [第 3 階段驗收](docs/STAGE_3_ACCEPTANCE.md)
+- [Derived Alarm Episode 契約](docs/INCIDENT_CONTRACT.md)
+- [Incident gap 敏感度分析](docs/INCIDENT_SENSITIVITY_ANALYSIS.md)
+- [Incident 統計基線分析](docs/INCIDENT_BASELINE_ANALYSIS.md)
+- [第 4 階段驗收](docs/STAGE_4_ACCEPTANCE.md)
 
 ## 資料集引用
 
