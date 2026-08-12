@@ -18,6 +18,8 @@ class BinaryRankingMetrics:
     hit_at_k: bool
     precision_at_k: float
     recall_at_k: float
+    maximum_recall_at_k: float
+    recall_efficiency_at_k: float
     reciprocal_rank: float
     ndcg_at_k: float
 
@@ -72,6 +74,18 @@ def compute_binary_ranking_metrics(
         if total_relevant_candidate_count == 0
         else relevant_retrieved_count / total_relevant_candidate_count
     )
+    maximum_recall_at_k = (
+        float('nan')
+        if total_relevant_candidate_count == 0
+        else min(k, total_relevant_candidate_count)
+        / total_relevant_candidate_count
+    )
+    recall_efficiency_at_k = (
+        float('nan')
+        if total_relevant_candidate_count == 0
+        else relevant_retrieved_count
+        / min(k, total_relevant_candidate_count)
+    )
 
     ideal_relevant_count = min(total_relevant_candidate_count, k)
     ideal_labels = (True,) * ideal_relevant_count
@@ -90,6 +104,8 @@ def compute_binary_ranking_metrics(
         hit_at_k=bool(relevant_retrieved_count),
         precision_at_k=relevant_retrieved_count / k,
         recall_at_k=recall_at_k,
+        maximum_recall_at_k=maximum_recall_at_k,
+        recall_efficiency_at_k=recall_efficiency_at_k,
         reciprocal_rank=reciprocal_rank,
         ndcg_at_k=ndcg_at_k,
     )

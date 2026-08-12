@@ -309,6 +309,27 @@ def build_query_evaluation_record(
     query_split: str,
 ) -> dict:
     metrics = evaluation.metrics
+    relevant_candidate_share = (
+        float('nan')
+        if evaluation.evaluable_candidate_count == 0
+        else evaluation.total_relevant_candidate_count
+        / evaluation.evaluable_candidate_count
+    )
+    expected_random_precision = (
+        float('nan')
+        if metrics is None or evaluation.evaluable_candidate_count == 0
+        else (
+            min(evaluation.k, evaluation.evaluable_candidate_count)
+            / evaluation.k
+            * relevant_candidate_share
+        )
+    )
+    precision_lift = (
+        float('nan')
+        if metrics is None
+        or expected_random_precision == 0
+        else metrics.precision_at_k / expected_random_precision
+    )
     return {
         'query_incident_id': evaluation.query_incident_id,
         'split': str(query_split),
@@ -322,6 +343,7 @@ def build_query_evaluation_record(
         'total_relevant_candidate_count': (
             evaluation.total_relevant_candidate_count
         ),
+        'relevant_candidate_share': relevant_candidate_share,
         'retrieved_count': (
             float('nan') if metrics is None else metrics.retrieved_count
         ),
@@ -339,6 +361,18 @@ def build_query_evaluation_record(
         'recall_at_k': (
             float('nan') if metrics is None else metrics.recall_at_k
         ),
+        'maximum_recall_at_k': (
+            float('nan')
+            if metrics is None
+            else metrics.maximum_recall_at_k
+        ),
+        'recall_efficiency_at_k': (
+            float('nan')
+            if metrics is None
+            else metrics.recall_efficiency_at_k
+        ),
+        'expected_random_precision_at_k': expected_random_precision,
+        'precision_lift_at_k': precision_lift,
         'reciprocal_rank': (
             float('nan') if metrics is None else metrics.reciprocal_rank
         ),
@@ -388,6 +422,21 @@ def build_split_metrics(query_summaries: pd.DataFrame) -> pd.DataFrame:
                     'precision_at_k'
                 ].mean(),
                 'mean_recall_at_k': split_queries['recall_at_k'].mean(),
+                'mean_relevant_candidate_share': split_queries[
+                    'relevant_candidate_share'
+                ].mean(),
+                'mean_maximum_recall_at_k': split_queries[
+                    'maximum_recall_at_k'
+                ].mean(),
+                'mean_recall_efficiency_at_k': split_queries[
+                    'recall_efficiency_at_k'
+                ].mean(),
+                'mean_expected_random_precision_at_k': split_queries[
+                    'expected_random_precision_at_k'
+                ].mean(),
+                'mean_precision_lift_at_k': split_queries[
+                    'precision_lift_at_k'
+                ].mean(),
                 'mean_reciprocal_rank': split_queries[
                     'reciprocal_rank'
                 ].mean(),

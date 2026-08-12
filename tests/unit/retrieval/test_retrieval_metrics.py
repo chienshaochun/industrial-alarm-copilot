@@ -22,6 +22,8 @@ def test_compute_binary_ranking_metrics_uses_rank_and_full_candidate_count():
     assert metrics.hit_at_k is True
     assert metrics.precision_at_k == pytest.approx(2 / 5)
     assert metrics.recall_at_k == pytest.approx(2 / 4)
+    assert metrics.maximum_recall_at_k == pytest.approx(1.0)
+    assert metrics.recall_efficiency_at_k == pytest.approx(2 / 4)
     assert metrics.reciprocal_rank == pytest.approx(1 / 2)
     assert metrics.ndcg_at_k == pytest.approx(actual_dcg / ideal_dcg)
     assert metrics.retrieved_count == 4
@@ -38,4 +40,18 @@ def test_compute_binary_ranking_metrics_marks_no_relevant_pool_undefined():
     assert metrics.precision_at_k == 0.0
     assert metrics.reciprocal_rank == 0.0
     assert math.isnan(metrics.recall_at_k)
+    assert math.isnan(metrics.maximum_recall_at_k)
+    assert math.isnan(metrics.recall_efficiency_at_k)
     assert math.isnan(metrics.ndcg_at_k)
+
+
+def test_compute_binary_ranking_metrics_exposes_top_k_recall_ceiling():
+    metrics = compute_binary_ranking_metrics(
+        [True, True, False, False, False],
+        k=5,
+        total_relevant_candidate_count=2000,
+    )
+
+    assert metrics.recall_at_k == pytest.approx(2 / 2000)
+    assert metrics.maximum_recall_at_k == pytest.approx(5 / 2000)
+    assert metrics.recall_efficiency_at_k == pytest.approx(2 / 5)

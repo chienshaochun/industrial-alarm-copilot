@@ -173,6 +173,8 @@ def test_evaluate_retrieval_query_uses_full_pool_and_ranked_top_five():
     assert evaluation.metrics.hit_at_k is True
     assert evaluation.metrics.precision_at_k == pytest.approx(1 / 5)
     assert evaluation.metrics.recall_at_k == pytest.approx(1.0)
+    assert evaluation.metrics.maximum_recall_at_k == pytest.approx(1.0)
+    assert evaluation.metrics.recall_efficiency_at_k == pytest.approx(1.0)
     assert evaluation.metrics.reciprocal_rank == pytest.approx(1 / 2)
 
 
@@ -230,6 +232,13 @@ def test_evaluate_retrieval_splits_reports_scores_and_coverage():
     assert split_metrics['query_with_relevant_candidates_count'] == 1
     assert split_metrics['mean_hit_at_k'] == pytest.approx(1.0)
     assert split_metrics['mean_precision_at_k'] == pytest.approx(1 / 5)
+    assert split_metrics['mean_relevant_candidate_share'] == (
+        pytest.approx(1 / 2)
+    )
+    assert split_metrics['mean_expected_random_precision_at_k'] == (
+        pytest.approx(1 / 5)
+    )
+    assert split_metrics['mean_precision_lift_at_k'] == pytest.approx(1.0)
 
 
 def test_query_evidence_can_be_rescored_without_retrieval():
