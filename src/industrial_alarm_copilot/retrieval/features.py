@@ -226,3 +226,34 @@ def combine_alarm_and_shape_features(
             ('shape_weight', float(shape_weight)),
         ),
     )
+
+
+def build_retrieval_feature_variants(
+    documents: pd.DataFrame,
+    incidents: pd.DataFrame,
+    alarm_weight: float = 1.0,
+    shape_weight: float = 1.0,
+) -> dict[str, AlarmFeatureMatrix]:
+    '''Build comparable train-fitted alarm-only and alarm-plus-shape variants.'''
+    document_ids = set(documents['incident_id'].astype(str))
+    incident_ids = set(incidents['incident_id'].astype(str))
+    if document_ids != incident_ids:
+        raise ValueError('documents and incidents must cover same IDs')
+
+    fitted_alarm = fit_alarm_tfidf(documents, incidents)
+    alarm_features = transform_alarm_documents(
+        fitted_alarm,
+        documents,
+    )
+    fitted_shape = fit_episode_shape(incidents)
+    shape_features = transform_episode_shape(fitted_shape, incidents)
+    combined_features = combine_alarm_and_shape_features(
+        alarm_features,
+        shape_features,
+        alarm_weight=alarm_weight,
+        shape_weight=shape_weight,
+    )
+    return {
+        alarm_features.feature_version: alarm_features,
+        combined_features.feature_version: combined_features,
+    }
