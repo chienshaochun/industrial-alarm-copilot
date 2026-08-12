@@ -304,7 +304,7 @@ def evaluate_retrieval_query(
     return score_retrieval_query_evidence(evidence, relevance_threshold)
 
 
-def _query_evaluation_record(
+def build_query_evaluation_record(
     evaluation: QueryRetrievalEvaluation,
     query_split: str,
 ) -> dict:
@@ -348,7 +348,7 @@ def _query_evaluation_record(
     }
 
 
-def _build_split_metrics(query_summaries: pd.DataFrame) -> pd.DataFrame:
+def build_split_metrics(query_summaries: pd.DataFrame) -> pd.DataFrame:
     records = []
     for split, split_queries in query_summaries.groupby(
         'split',
@@ -433,7 +433,7 @@ def evaluate_retrieval_splits(
             outcome_alarm_matrix=outcome_alarm_matrix,
         )
         summary_records.append(
-            _query_evaluation_record(evaluation, str(query.split))
+            build_query_evaluation_record(evaluation, str(query.split))
         )
         if not evaluation.ranked_results.empty:
             ranked_frame = evaluation.ranked_results.copy()
@@ -449,5 +449,5 @@ def evaluate_retrieval_splits(
     return RetrievalBatchEvaluation(
         query_summaries=query_summaries,
         ranked_results=ranked_results,
-        split_metrics=_build_split_metrics(query_summaries),
+        split_metrics=build_split_metrics(query_summaries),
     )
