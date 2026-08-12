@@ -3,6 +3,7 @@
 import pandas as pd
 
 from industrial_alarm_copilot.retrieval.evaluation import (
+    build_retrieval_evaluation_index,
     build_query_evaluation_record,
     build_split_metrics,
     prepare_retrieval_query_evidence,
@@ -55,6 +56,10 @@ def run_validation_experiment_grid(
             future_horizon_hours=horizon_hours,
         )
         outcome_alarm_matrix = build_outcome_alarm_matrix(outcomes)
+        evaluation_index = build_retrieval_evaluation_index(
+            incidents,
+            outcomes,
+        )
 
         for feature_version, features in feature_variants.items():
             evidence_by_query_id = {
@@ -67,6 +72,7 @@ def run_validation_experiment_grid(
                     top_k=settings.top_k,
                     policy=settings.candidate_policy,
                     outcome_alarm_matrix=outcome_alarm_matrix,
+                    evaluation_index=evaluation_index,
                 )
                 for query in validation_queries.itertuples(index=False)
             }

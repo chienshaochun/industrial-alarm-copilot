@@ -8,7 +8,7 @@ import pandas as pd
 
 from industrial_alarm_copilot.retrieval.candidates import (
     CandidatePolicy,
-    select_historical_candidates,
+    VALID_CANDIDATE_POLICIES,
 )
 from industrial_alarm_copilot.retrieval.features import AlarmFeatureMatrix
 from industrial_alarm_copilot.retrieval.metrics import (
@@ -73,6 +73,89 @@ class RetrievalBatchEvaluation:
     split_metrics: pd.DataFrame
 
 
+@dataclass(frozen=True)
+class RetrievalEvaluationIndex:
+    '''Arrays aligned once for repeated time-safe candidate selection.'''
+
+    incident_ids: tuple[str, ...]
+    row_by_incident_id: dict[str, int]
+    start_times: np.ndarray
+    end_times: np.ndarray
+    train_mask: np.ndarray
+    outcome_end_times: np.ndarray
+    outcome_complete: np.ndarray
+    has_future_alarms: np.ndarray | None
+
+    def candidate_row_numbers(
+        self,
+        query_incident_id: str,
+        policy: CandidatePolicy,
+    ) -> np.ndarray:
+        '''Return rows passing episode and outcome time gates.'''
+        if policy not in VALID_CANDIDATE_POLICIES:
+            raise ValueError(f'unsupported candidate policy: {policy}')
+        try:
+            query_row = self.row_by_incident_id[str(query_incident_id)]
+        except KeyError as error:
+            raise KeyError(
+                f'unknown query incident_id: {query_incident_id}'
+            ) from error
+
+        query_start_time = self.start_times[query_row]
+        candidate_mask = (
+            (self.end_times < query_start_time)
+            & self.outcome_complete
+            & (self.outcome_end_times < query_start_time)
+        )
+        if policy == 'train_only':
+            candidate_mask &= self.train_mask
+        candidate_mask[query_row] = False
+        return np.flatnonzero(candidate_mask)
+
+
+def build_retrieval_evaluation_index(
+    incidents: pd.DataFrame,
+    outcomes: pd.DataFrame,
+) -> RetrievalEvaluationIndex:
+    '''Align incidents and outcomes once before evaluating many queries.'''
+    if not incidents['incident_id'].is_unique:
+        raise ValueError('incidents incident_id must be unique')
+    if not outcomes['incident_id'].is_unique:
+        raise ValueError('outcomes incident_id must be unique')
+
+    incident_ids = tuple(incidents['incident_id'].astype(str))
+    outcome_table = outcomes.copy()
+    outcome_table['incident_id'] = outcome_table['incident_id'].astype(str)
+    outcome_table = outcome_table.set_index('incident_id')
+    missing_outcome_ids = set(incident_ids).difference(outcome_table.index)
+    if missing_outcome_ids:
+        raise ValueError('every incident must have an outcome')
+    aligned_outcomes = outcome_table.loc[list(incident_ids)]
+
+    has_future_alarms = (
+        aligned_outcomes['has_future_alarms'].astype(bool).to_numpy()
+        if 'has_future_alarms' in aligned_outcomes
+        else None
+    )
+    return RetrievalEvaluationIndex(
+        incident_ids=incident_ids,
+        row_by_incident_id={
+            incident_id: row_number
+            for row_number, incident_id in enumerate(incident_ids)
+        },
+        start_times=incidents['start_time'].to_numpy(dtype='datetime64[ns]'),
+        end_times=incidents['end_time'].to_numpy(dtype='datetime64[ns]'),
+        train_mask=incidents['split'].eq('train').to_numpy(),
+        outcome_end_times=aligned_outcomes[
+            'outcome_end_time'
+        ].to_numpy(dtype='datetime64[ns]'),
+        outcome_complete=aligned_outcomes[
+            'outcome_is_complete'
+        ].astype(bool).to_numpy(),
+        has_future_alarms=has_future_alarms,
+    )
+
+
 def select_outcome_evaluable_candidates(
     incidents: pd.DataFrame,
     outcomes: pd.DataFrame,
@@ -80,40 +163,15 @@ def select_outcome_evaluable_candidates(
     policy: CandidatePolicy = 'expanding_history',
 ) -> pd.DataFrame:
     '''Return historical candidates whose complete outcomes predate query.'''
-    if not outcomes['incident_id'].is_unique:
-        raise ValueError('outcomes incident_id must be unique')
-
-    candidates = select_historical_candidates(
+    evaluation_index = build_retrieval_evaluation_index(
         incidents,
+        outcomes,
+    )
+    candidate_rows = evaluation_index.candidate_row_numbers(
         query_incident_id,
-        policy=policy,
+        policy,
     )
-    query_rows = incidents.loc[
-        incidents['incident_id'].eq(query_incident_id)
-    ]
-    query_start_time = query_rows.iloc[0]['start_time']
-
-    outcome_columns = outcomes[
-        ['incident_id', 'outcome_end_time', 'outcome_is_complete']
-    ].copy()
-    candidates_with_outcomes = candidates.merge(
-        outcome_columns,
-        on='incident_id',
-        how='left',
-        sort=False,
-        validate='one_to_one',
-    )
-    if candidates_with_outcomes['outcome_is_complete'].isna().any():
-        raise ValueError('every candidate must have an outcome')
-
-    evaluation_mask = (
-        candidates_with_outcomes['outcome_is_complete'].astype(bool)
-        & candidates_with_outcomes['outcome_end_time'].lt(query_start_time)
-    )
-    return candidates_with_outcomes.loc[
-        evaluation_mask,
-        candidates.columns,
-    ].copy()
+    return incidents.iloc[candidate_rows].copy()
 
 
 def _empty_ranked_results() -> pd.DataFrame:
@@ -129,6 +187,7 @@ def prepare_retrieval_query_evidence(
     top_k: int = 5,
     policy: CandidatePolicy = 'expanding_history',
     outcome_alarm_matrix: OutcomeAlarmMatrix | None = None,
+    evaluation_index: RetrievalEvaluationIndex | None = None,
 ) -> QueryRetrievalEvidence:
     '''Prepare one query once so multiple thresholds can reuse evidence.'''
     if top_k <= 0:
@@ -136,12 +195,21 @@ def prepare_retrieval_query_evidence(
     if not outcomes['incident_id'].is_unique:
         raise ValueError('outcomes incident_id must be unique')
 
-    query_outcomes = outcomes.loc[
-        outcomes['incident_id'].eq(query_incident_id)
-    ]
-    if query_outcomes.empty:
-        raise ValueError('query must have an outcome')
-    query_outcome = query_outcomes.iloc[0]
+    if evaluation_index is None:
+        evaluation_index = build_retrieval_evaluation_index(
+            incidents,
+            outcomes,
+        )
+    if evaluation_index.has_future_alarms is None:
+        raise ValueError('outcomes must include has_future_alarms')
+    try:
+        query_index_row = evaluation_index.row_by_incident_id[
+            str(query_incident_id)
+        ]
+    except KeyError as error:
+        raise KeyError(
+            f'unknown query incident_id: {query_incident_id}'
+        ) from error
 
     base_result = {
         'query_incident_id': str(query_incident_id),
@@ -149,7 +217,7 @@ def prepare_retrieval_query_evidence(
         'candidate_policy': policy,
         'feature_version': features.feature_version,
     }
-    if not bool(query_outcome['outcome_is_complete']):
+    if not bool(evaluation_index.outcome_complete[query_index_row]):
         return QueryRetrievalEvidence(
             **base_result,
             status='query_outcome_incomplete',
@@ -157,7 +225,7 @@ def prepare_retrieval_query_evidence(
             candidate_outcome_jaccard=np.asarray([], dtype=float),
             ranked_results=_empty_ranked_results(),
         )
-    if not bool(query_outcome['has_future_alarms']):
+    if not bool(evaluation_index.has_future_alarms[query_index_row]):
         return QueryRetrievalEvidence(
             **base_result,
             status='query_without_future_alarms',
@@ -166,13 +234,11 @@ def prepare_retrieval_query_evidence(
             ranked_results=_empty_ranked_results(),
         )
 
-    candidates = select_outcome_evaluable_candidates(
-        incidents,
-        outcomes,
+    candidate_rows = evaluation_index.candidate_row_numbers(
         query_incident_id,
-        policy=policy,
+        policy,
     )
-    if candidates.empty:
+    if len(candidate_rows) == 0:
         return QueryRetrievalEvidence(
             **base_result,
             status='no_evaluable_candidates',
@@ -184,7 +250,8 @@ def prepare_retrieval_query_evidence(
     if outcome_alarm_matrix is None:
         outcome_alarm_matrix = build_outcome_alarm_matrix(outcomes)
     candidate_incident_ids = tuple(
-        candidates['incident_id'].astype(str)
+        evaluation_index.incident_ids[row_number]
+        for row_number in candidate_rows
     )
     candidate_outcome_jaccard = compute_outcome_jaccard_scores(
         outcome_alarm_matrix,
@@ -192,9 +259,8 @@ def prepare_retrieval_query_evidence(
         candidate_incident_ids,
     )
 
-    query_row = incidents.loc[
-        incidents['incident_id'].eq(query_incident_id)
-    ]
+    query_row = incidents.iloc[[query_index_row]]
+    candidates = incidents.iloc[candidate_rows]
     evaluation_incidents = pd.concat(
         [query_row, candidates],
         ignore_index=True,
@@ -289,6 +355,7 @@ def evaluate_retrieval_query(
     top_k: int = 5,
     policy: CandidatePolicy = 'expanding_history',
     outcome_alarm_matrix: OutcomeAlarmMatrix | None = None,
+    evaluation_index: RetrievalEvaluationIndex | None = None,
 ) -> QueryRetrievalEvaluation:
     '''Evaluate one query against its complete historical outcome pool.'''
     evidence = prepare_retrieval_query_evidence(
@@ -300,6 +367,7 @@ def evaluate_retrieval_query(
         top_k=top_k,
         policy=policy,
         outcome_alarm_matrix=outcome_alarm_matrix,
+        evaluation_index=evaluation_index,
     )
     return score_retrieval_query_evidence(evidence, relevance_threshold)
 
@@ -467,6 +535,10 @@ def evaluate_retrieval_splits(
         raise ValueError('query_splits must select at least one incident')
 
     outcome_alarm_matrix = build_outcome_alarm_matrix(outcomes)
+    evaluation_index = build_retrieval_evaluation_index(
+        incidents,
+        outcomes,
+    )
     summary_records = []
     ranked_frames = []
     for query in query_rows.itertuples(index=False):
@@ -480,6 +552,7 @@ def evaluate_retrieval_splits(
             top_k=top_k,
             policy=policy,
             outcome_alarm_matrix=outcome_alarm_matrix,
+            evaluation_index=evaluation_index,
         )
         summary_records.append(
             build_query_evaluation_record(evaluation, str(query.split))

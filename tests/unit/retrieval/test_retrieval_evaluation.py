@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from industrial_alarm_copilot.retrieval.evaluation import (
+    build_retrieval_evaluation_index,
     evaluate_retrieval_query,
     evaluate_retrieval_splits,
     prepare_retrieval_query_evidence,
@@ -70,6 +71,18 @@ def test_select_outcome_evaluable_candidates_applies_second_time_gate():
     )
 
     assert candidates['incident_id'].tolist() == ['old_complete']
+
+    evaluation_index = build_retrieval_evaluation_index(
+        incidents,
+        outcomes,
+    )
+    candidate_rows = evaluation_index.candidate_row_numbers(
+        'query',
+        'expanding_history',
+    )
+    assert incidents.iloc[candidate_rows]['incident_id'].tolist() == [
+        'old_complete'
+    ]
 
 
 def _build_query_evaluation_inputs():
