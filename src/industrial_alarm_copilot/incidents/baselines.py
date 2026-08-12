@@ -16,6 +16,11 @@ MACHINE_BASELINE_COLUMNS = [
     'duration_seconds_threshold',
     'distinct_alarm_count_threshold',
 ]
+BASELINE_METRICS = (
+    'event_count',
+    'duration_seconds',
+    'distinct_alarm_count',
+)
 
 
 @dataclass(frozen=True)
@@ -113,3 +118,69 @@ def fit_machine_incident_baselines(
         )
 
     return pd.DataFrame(baseline_rows, columns=MACHINE_BASELINE_COLUMNS)
+
+
+def apply_incident_baseline_flags(
+    incidents: pd.DataFrame,
+    global_baseline: GlobalIncidentBaseline,
+    machine_baselines: pd.DataFrame,
+) -> pd.DataFrame:
+    '''Apply machine thresholds with a global fallback to all incidents.'''
+    normalized_baselines = machine_baselines.copy()
+    normalized_baselines['machine_id'] = normalized_baselines[
+        'machine_id'
+    ].astype('string')
+    if normalized_baselines['machine_id'].duplicated().any():
+        raise ValueError('machine baselines must contain unique machine_id')
+
+    baseline_by_machine = normalized_baselines.set_index('machine_id')
+    machine_keys = incidents['machine_id'].astype('string')
+    machine_support = machine_keys.map(
+        baseline_by_machine['incident_count']
+    )
+    use_machine_baseline = (
+        machine_keys.map(baseline_by_machine['has_sufficient_support'])
+        .eq(True)
+    )
+
+    flagged_incidents = incidents.copy()
+    flagged_incidents['baseline_scope'] = pd.Series(
+        'global_fallback',
+        index=flagged_incidents.index,
+        dtype='string',
+    )
+    flagged_incidents.loc[use_machine_baseline, 'baseline_scope'] = 'machine'
+    flagged_incidents['machine_train_incident_count'] = (
+        machine_support.fillna(0).astype('int64')
+    )
+    flagged_incidents['baseline_train_incident_count'] = (
+        machine_support.where(
+            use_machine_baseline,
+            global_baseline.incident_count,
+        ).astype('int64')
+    )
+    flagged_incidents['baseline_quantile'] = global_baseline.quantile
+
+    flag_columns = []
+    for metric in BASELINE_METRICS:
+        threshold_column = f'{metric}_threshold'
+        flag_column = f'is_high_{metric}'
+        machine_threshold = machine_keys.map(
+            baseline_by_machine[threshold_column]
+        )
+        flagged_incidents[threshold_column] = machine_threshold.where(
+            use_machine_baseline,
+            getattr(global_baseline, threshold_column),
+        ).astype(float)
+        flagged_incidents[flag_column] = flagged_incidents[metric].gt(
+            flagged_incidents[threshold_column]
+        )
+        flag_columns.append(flag_column)
+
+    flagged_incidents['upper_tail_flag_count'] = (
+        flagged_incidents[flag_columns].sum(axis=1).astype('int64')
+    )
+    flagged_incidents['is_upper_tail'] = flagged_incidents[
+        'upper_tail_flag_count'
+    ].gt(0)
+    return flagged_incidents
