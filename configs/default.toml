@@ -6,6 +6,9 @@ sensitivity_gap_minutes = [15, 30, 60]
 quantile = 0.95
 minimum_incident_count = 200
 
+[retrieval]
+top_k = 5
+
 [split]
 strategy = "per_machine_unique_timestamp"
 train_ratio = 0.70
