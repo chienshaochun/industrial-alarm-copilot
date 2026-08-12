@@ -12,7 +12,10 @@ from industrial_alarm_copilot.data.artifacts import (
     calculate_file_sha256,
     write_metadata_json,
 )
-from industrial_alarm_copilot.incidents.pipeline import IncidentAnalysis
+from industrial_alarm_copilot.incidents.pipeline import (
+    IncidentAnalysis,
+    build_incident_analysis,
+)
 
 
 @dataclass(frozen=True)
@@ -125,4 +128,41 @@ def write_incident_analysis_artifacts(
         incidents_parquet=incidents_path,
         incident_events_parquet=incident_events_path,
         baselines_json=baselines_path,
+    )
+
+
+def prepare_incident_artifacts(
+    events_parquet_path: str | Path,
+    output_dir: str | Path,
+    pipeline_settings: dict[str, Any],
+    code_version: str,
+    generated_at: datetime | None = None,
+) -> IncidentArtifactPaths:
+    '''Build incident analysis from processed events and write artifacts.'''
+    incident_settings = pipeline_settings['incidents']
+    baseline_settings = pipeline_settings['baselines']
+    selected_settings = {
+        'gap_minutes': float(incident_settings['gap_minutes']),
+        'baseline_quantile': float(baseline_settings['quantile']),
+        'minimum_incident_count': int(
+            baseline_settings['minimum_incident_count']
+        ),
+    }
+
+    events = pd.read_parquet(events_parquet_path)
+    analysis = build_incident_analysis(
+        events,
+        gap_minutes=selected_settings['gap_minutes'],
+        baseline_quantile=selected_settings['baseline_quantile'],
+        minimum_incident_count=selected_settings[
+            'minimum_incident_count'
+        ],
+    )
+    return write_incident_analysis_artifacts(
+        analysis,
+        source_events_path=events_parquet_path,
+        output_dir=output_dir,
+        settings=selected_settings,
+        code_version=code_version,
+        generated_at=generated_at,
     )

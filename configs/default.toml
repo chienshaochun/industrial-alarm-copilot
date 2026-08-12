@@ -2,6 +2,10 @@
 gap_minutes = 30
 sensitivity_gap_minutes = [15, 30, 60]
 
+[baselines]
+quantile = 0.95
+minimum_incident_count = 200
+
 [split]
 strategy = "per_machine_unique_timestamp"
 train_ratio = 0.70
