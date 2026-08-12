@@ -29,6 +29,7 @@ def build_alarm_documents(
     )
     if mapped_events['alarm_code'].isna().any():
         raise ValueError('every mapped source_row must reference an event')
+    mapped_events['alarm_code'] = mapped_events['alarm_code'].astype('string')
 
     mapped_events = mapped_events.sort_values(
         ['incident_id', 'event_position'],
@@ -39,7 +40,7 @@ def build_alarm_documents(
         .agg(
             alarm_document=(
                 'alarm_code',
-                lambda codes: ' '.join(codes.astype('string')),
+                ' '.join,
             ),
             alarm_token_count=('alarm_code', 'size'),
         )

@@ -49,14 +49,15 @@ def build_future_alarm_outcomes(
     ordered_events['machine_id'] = ordered_events[
         'machine_id'
     ].astype(str)
+    ordered_events['alarm_code'] = ordered_events['alarm_code'].astype(str)
     ordered_events = ordered_events.sort_values(
         ['machine_id', 'timestamp'],
         kind='stable',
     )
     events_by_machine = {
         str(machine_id): (
-            machine_events['timestamp'].reset_index(drop=True),
-            machine_events['alarm_code'].astype(str).reset_index(drop=True),
+            machine_events['timestamp'].to_numpy(dtype='datetime64[ns]'),
+            machine_events['alarm_code'].to_numpy(dtype=str),
         )
         for machine_id, machine_events in ordered_events.groupby(
             'machine_id',
@@ -65,50 +66,85 @@ def build_future_alarm_outcomes(
         )
     }
 
-    horizon = pd.to_timedelta(float(future_horizon_hours), unit='h')
-    records = []
-    for incident in incidents.itertuples(index=False):
-        outcome_start_time = incident.end_time
-        outcome_end_time = outcome_start_time + horizon
-        machine_events = events_by_machine.get(str(incident.machine_id))
+    incident_count = len(incidents)
+    incident_ids = incidents['incident_id'].astype(str).to_numpy()
+    incident_machines = incidents['machine_id'].astype(str).to_numpy()
+    outcome_start_times = incidents['end_time'].to_numpy(
+        dtype='datetime64[ns]'
+    )
+    horizon = pd.to_timedelta(
+        float(future_horizon_hours),
+        unit='h',
+    ).to_timedelta64()
+    outcome_end_times = outcome_start_times + horizon
+    outcome_observed_through = np.full(
+        incident_count,
+        np.datetime64('NaT', 'ns'),
+        dtype='datetime64[ns]',
+    )
+    outcome_is_complete = np.zeros(incident_count, dtype=bool)
+    future_event_count = np.zeros(incident_count, dtype=np.int64)
+    distinct_future_alarm_count = np.zeros(
+        incident_count,
+        dtype=np.int64,
+    )
+    future_alarm_codes = [()] * incident_count
 
+    incident_rows_by_machine: dict[str, list[int]] = {}
+    for row_number, machine_id in enumerate(incident_machines):
+        incident_rows_by_machine.setdefault(machine_id, []).append(row_number)
+
+    for machine_id, row_numbers_list in incident_rows_by_machine.items():
+        machine_events = events_by_machine.get(machine_id)
         if machine_events is None:
-            future_codes = []
-            outcome_observed_through = pd.NaT
-        else:
-            timestamps, alarm_codes = machine_events
-            outcome_observed_through = timestamps.iloc[-1]
-            left = timestamps.searchsorted(
-                outcome_start_time,
-                side='right',
-            )
-            right = timestamps.searchsorted(
-                outcome_end_time,
-                side='right',
-            )
-            future_codes = alarm_codes.iloc[left:right].tolist()
+            continue
 
-        distinct_codes = tuple(sorted(set(future_codes)))
-        records.append(
-            {
-                'incident_id': str(incident.incident_id),
-                'outcome_start_time': outcome_start_time,
-                'outcome_end_time': outcome_end_time,
-                'outcome_observed_through': outcome_observed_through,
-                'outcome_is_complete': bool(
-                    pd.notna(outcome_observed_through)
-                    and outcome_observed_through >= outcome_end_time
-                ),
-                'future_horizon_hours': float(future_horizon_hours),
-                'future_event_count': len(future_codes),
-                'distinct_future_alarm_count': len(distinct_codes),
-                'future_alarm_codes': distinct_codes,
-                'has_future_alarms': bool(future_codes),
-            }
+        timestamps, alarm_codes = machine_events
+        row_numbers = np.asarray(row_numbers_list, dtype=np.int64)
+        left_boundaries = np.searchsorted(
+            timestamps,
+            outcome_start_times[row_numbers],
+            side='right',
+        )
+        right_boundaries = np.searchsorted(
+            timestamps,
+            outcome_end_times[row_numbers],
+            side='right',
+        )
+        observed_through = timestamps[-1]
+        outcome_observed_through[row_numbers] = observed_through
+        outcome_is_complete[row_numbers] = (
+            observed_through >= outcome_end_times[row_numbers]
+        )
+        future_event_count[row_numbers] = (
+            right_boundaries - left_boundaries
         )
 
-    return pd.DataFrame.from_records(
-        records,
+        for row_number, left, right in zip(
+            row_numbers,
+            left_boundaries,
+            right_boundaries,
+            strict=True,
+        ):
+            distinct_codes = tuple(
+                np.unique(alarm_codes[left:right]).tolist()
+            )
+            future_alarm_codes[row_number] = distinct_codes
+            distinct_future_alarm_count[row_number] = len(distinct_codes)
+
+    return pd.DataFrame(
+        {
+            'incident_id': incident_ids,
+            'outcome_start_time': outcome_start_times,
+            'outcome_end_time': outcome_end_times,
+            'outcome_observed_through': outcome_observed_through,
+            'outcome_is_complete': outcome_is_complete,
+            'future_horizon_hours': float(future_horizon_hours),
+            'future_event_count': future_event_count,
+            'distinct_future_alarm_count': distinct_future_alarm_count,
+            'future_alarm_codes': future_alarm_codes,
+            'has_future_alarms': future_event_count > 0,
+        },
         columns=FUTURE_OUTCOME_COLUMNS,
     )
 
