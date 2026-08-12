@@ -5,12 +5,14 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from scipy import sparse
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, normalize
 
 
 ALARM_TFIDF_FEATURE_VERSION = 'alarm_tfidf_v1'
 EPISODE_SHAPE_FEATURE_VERSION = 'episode_shape_v1'
+ALARM_PLUS_SHAPE_FEATURE_VERSION = 'alarm_plus_shape_v1'
 SHAPE_SOURCE_COLUMNS = (
     'event_count',
     'duration_seconds',
@@ -47,6 +49,7 @@ class AlarmFeatureMatrix:
     matrix: Any
     feature_names: tuple[str, ...]
     feature_version: str
+    feature_parameters: tuple[tuple[str, float], ...] = ()
 
 
 def fit_alarm_tfidf(
@@ -156,4 +159,70 @@ def transform_episode_shape(
         matrix=shape_matrix,
         feature_names=SHAPE_FEATURE_NAMES,
         feature_version=fitted_shape.feature_version,
+    )
+
+
+def combine_alarm_and_shape_features(
+    alarm_features: AlarmFeatureMatrix,
+    shape_features: AlarmFeatureMatrix,
+    alarm_weight: float = 1.0,
+    shape_weight: float = 1.0,
+) -> AlarmFeatureMatrix:
+    '''Align, weight, and combine alarm composition with episode shape.'''
+    weights = np.asarray([alarm_weight, shape_weight], dtype=float)
+    if not np.isfinite(weights).all() or (weights < 0).any():
+        raise ValueError('feature weights must be finite and nonnegative')
+    if not weights.any():
+        raise ValueError('at least one feature weight must be positive')
+    if len(set(alarm_features.incident_ids)) != len(
+        alarm_features.incident_ids
+    ):
+        raise ValueError('alarm feature incident_ids must be unique')
+    if len(set(shape_features.incident_ids)) != len(
+        shape_features.incident_ids
+    ):
+        raise ValueError('shape feature incident_ids must be unique')
+    if set(alarm_features.incident_ids) != set(shape_features.incident_ids):
+        raise ValueError('alarm and shape features must cover same incidents')
+
+    shape_row_by_id = {
+        incident_id: row_number
+        for row_number, incident_id in enumerate(shape_features.incident_ids)
+    }
+    aligned_shape_rows = [
+        shape_row_by_id[incident_id]
+        for incident_id in alarm_features.incident_ids
+    ]
+
+    alarm_block = normalize(
+        alarm_features.matrix,
+        norm='l2',
+        copy=True,
+    )
+    shape_block = normalize(
+        shape_features.matrix[aligned_shape_rows],
+        norm='l2',
+        copy=True,
+    )
+    combined_matrix = sparse.hstack(
+        [
+            sparse.csr_matrix(alarm_block) * float(alarm_weight),
+            sparse.csr_matrix(shape_block) * float(shape_weight),
+        ],
+        format='csr',
+    )
+    combined_matrix = normalize(combined_matrix, norm='l2', copy=False)
+
+    return AlarmFeatureMatrix(
+        incident_ids=alarm_features.incident_ids,
+        matrix=combined_matrix,
+        feature_names=(
+            tuple(f'alarm_{name}' for name in alarm_features.feature_names)
+            + shape_features.feature_names
+        ),
+        feature_version=ALARM_PLUS_SHAPE_FEATURE_VERSION,
+        feature_parameters=(
+            ('alarm_weight', float(alarm_weight)),
+            ('shape_weight', float(shape_weight)),
+        ),
     )

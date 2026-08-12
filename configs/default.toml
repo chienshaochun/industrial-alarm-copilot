@@ -8,6 +8,8 @@ minimum_incident_count = 200
 
 [retrieval]
 top_k = 5
+alarm_weight = 1.0
+shape_weight = 1.0
 
 [split]
 strategy = "per_machine_unique_timestamp"
