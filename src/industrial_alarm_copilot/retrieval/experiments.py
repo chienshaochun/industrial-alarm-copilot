@@ -25,6 +25,7 @@ def run_validation_experiment_grid(
     documents: pd.DataFrame,
     events: pd.DataFrame,
     settings: RetrievalExperimentSettings,
+    max_validation_queries: int | None = None,
 ) -> pd.DataFrame:
     '''Compare feature, horizon, and relevance settings on validation only.'''
     validation_queries = incidents.loc[
@@ -35,6 +36,10 @@ def run_validation_experiment_grid(
     )
     if validation_queries.empty:
         raise ValueError('at least one validation incident is required')
+    if max_validation_queries is not None:
+        if max_validation_queries <= 0:
+            raise ValueError('max_validation_queries must be positive')
+        validation_queries = validation_queries.head(max_validation_queries)
 
     feature_variants = build_retrieval_feature_variants(
         documents,
@@ -93,6 +98,7 @@ def run_validation_experiment_grid(
                             if feature_version == 'alarm_tfidf_v1'
                             else settings.shape_weight
                         ),
+                        'query_limit': max_validation_queries,
                         **split_metrics.drop(labels='split').to_dict(),
                     }
                 )

@@ -88,3 +88,4 @@ def test_run_validation_experiment_grid_expands_only_validation_scores():
     assert set(results['relevance_threshold']) == {0.1, 0.5}
     assert results['query_count'].eq(1).all()
     assert results['top_k'].eq(5).all()
+    assert results['query_limit'].isna().all()
