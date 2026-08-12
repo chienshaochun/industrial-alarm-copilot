@@ -19,6 +19,9 @@ from industrial_alarm_copilot.retrieval.outcomes import (
 from industrial_alarm_copilot.retrieval.settings import (
     RetrievalExperimentSettings,
 )
+from industrial_alarm_copilot.retrieval.search import (
+    build_retrieval_search_index,
+)
 
 
 def run_validation_experiment_grid(
@@ -62,6 +65,11 @@ def run_validation_experiment_grid(
         )
 
         for feature_version, features in feature_variants.items():
+            search_index = build_retrieval_search_index(
+                incidents,
+                documents,
+                features,
+            )
             evidence_by_query_id = {
                 str(query.incident_id): prepare_retrieval_query_evidence(
                     incidents,
@@ -73,6 +81,7 @@ def run_validation_experiment_grid(
                     policy=settings.candidate_policy,
                     outcome_alarm_matrix=outcome_alarm_matrix,
                     evaluation_index=evaluation_index,
+                    search_index=search_index,
                 )
                 for query in validation_queries.itertuples(index=False)
             }

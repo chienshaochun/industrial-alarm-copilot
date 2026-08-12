@@ -23,7 +23,8 @@ from industrial_alarm_copilot.retrieval.outcomes import (
 from industrial_alarm_copilot.retrieval.relevance import RELEVANCE_COLUMNS
 from industrial_alarm_copilot.retrieval.search import (
     RETRIEVAL_RESULT_COLUMNS,
-    retrieve_similar_episodes,
+    RetrievalSearchIndex,
+    build_retrieval_search_index,
 )
 
 
@@ -188,6 +189,7 @@ def prepare_retrieval_query_evidence(
     policy: CandidatePolicy = 'expanding_history',
     outcome_alarm_matrix: OutcomeAlarmMatrix | None = None,
     evaluation_index: RetrievalEvaluationIndex | None = None,
+    search_index: RetrievalSearchIndex | None = None,
 ) -> QueryRetrievalEvidence:
     '''Prepare one query once so multiple thresholds can reuse evidence.'''
     if top_k <= 0:
@@ -202,6 +204,14 @@ def prepare_retrieval_query_evidence(
         )
     if evaluation_index.has_future_alarms is None:
         raise ValueError('outcomes must include has_future_alarms')
+    if search_index is None:
+        search_index = build_retrieval_search_index(
+            incidents,
+            documents,
+            features,
+        )
+    if tuple(search_index.incident_ids) != evaluation_index.incident_ids:
+        raise ValueError('retrieval indexes must share incident row order')
     try:
         query_index_row = evaluation_index.row_by_incident_id[
             str(query_incident_id)
@@ -259,17 +269,9 @@ def prepare_retrieval_query_evidence(
         candidate_incident_ids,
     )
 
-    query_row = incidents.iloc[[query_index_row]]
-    candidates = incidents.iloc[candidate_rows]
-    evaluation_incidents = pd.concat(
-        [query_row, candidates],
-        ignore_index=True,
-    )
-    ranked_results = retrieve_similar_episodes(
-        evaluation_incidents,
-        documents,
-        features,
+    ranked_results = search_index.retrieve_candidate_rows(
         query_incident_id,
+        candidate_rows,
         top_k=top_k,
         policy=policy,
     )
@@ -284,7 +286,7 @@ def prepare_retrieval_query_evidence(
     return QueryRetrievalEvidence(
         **base_result,
         status='evaluated',
-        evaluable_candidate_count=len(candidates),
+        evaluable_candidate_count=len(candidate_rows),
         candidate_outcome_jaccard=candidate_outcome_jaccard,
         ranked_results=ranked_results,
     )
@@ -356,6 +358,7 @@ def evaluate_retrieval_query(
     policy: CandidatePolicy = 'expanding_history',
     outcome_alarm_matrix: OutcomeAlarmMatrix | None = None,
     evaluation_index: RetrievalEvaluationIndex | None = None,
+    search_index: RetrievalSearchIndex | None = None,
 ) -> QueryRetrievalEvaluation:
     '''Evaluate one query against its complete historical outcome pool.'''
     evidence = prepare_retrieval_query_evidence(
@@ -368,6 +371,7 @@ def evaluate_retrieval_query(
         policy=policy,
         outcome_alarm_matrix=outcome_alarm_matrix,
         evaluation_index=evaluation_index,
+        search_index=search_index,
     )
     return score_retrieval_query_evidence(evidence, relevance_threshold)
 
@@ -539,6 +543,11 @@ def evaluate_retrieval_splits(
         incidents,
         outcomes,
     )
+    search_index = build_retrieval_search_index(
+        incidents,
+        documents,
+        features,
+    )
     summary_records = []
     ranked_frames = []
     for query in query_rows.itertuples(index=False):
@@ -553,6 +562,7 @@ def evaluate_retrieval_splits(
             policy=policy,
             outcome_alarm_matrix=outcome_alarm_matrix,
             evaluation_index=evaluation_index,
+            search_index=search_index,
         )
         summary_records.append(
             build_query_evaluation_record(evaluation, str(query.split))

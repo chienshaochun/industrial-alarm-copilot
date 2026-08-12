@@ -1,5 +1,6 @@
 '''Exact episode retrieval tests.'''
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -9,6 +10,7 @@ from industrial_alarm_copilot.retrieval.features import (
 )
 from industrial_alarm_copilot.retrieval.search import (
     RETRIEVAL_RESULT_COLUMNS,
+    build_retrieval_search_index,
     retrieve_similar_episodes,
 )
 
@@ -117,3 +119,34 @@ def test_retrieve_similar_episodes_returns_empty_when_history_is_empty():
 
     assert results.empty
     assert results.columns.tolist() == RETRIEVAL_RESULT_COLUMNS
+
+
+def test_reusable_search_index_matches_public_retrieval_result():
+    incidents, documents, features = _build_retrieval_inputs()
+    search_index = build_retrieval_search_index(
+        incidents,
+        documents,
+        features,
+    )
+    candidate_rows = np.asarray(
+        [
+            search_index.row_by_incident_id['inc_old_best'],
+            search_index.row_by_incident_id['inc_tie_b'],
+            search_index.row_by_incident_id['inc_tie_a'],
+        ]
+    )
+
+    indexed_results = search_index.retrieve_candidate_rows(
+        'inc_query',
+        candidate_rows,
+        top_k=10,
+    )
+    public_results = retrieve_similar_episodes(
+        incidents,
+        documents,
+        features,
+        query_incident_id='inc_query',
+        top_k=10,
+    )
+
+    pd.testing.assert_frame_equal(indexed_results, public_results)
