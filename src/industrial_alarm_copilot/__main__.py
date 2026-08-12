@@ -12,6 +12,9 @@ from industrial_alarm_copilot.data.runtime import (
 from industrial_alarm_copilot.incidents.artifacts import (
     prepare_incident_artifacts,
 )
+from industrial_alarm_copilot.retrieval.pipeline import (
+    run_validation_from_artifacts,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -59,6 +62,36 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path('data/processed'),
     )
 
+    validate_retrieval = commands.add_parser(
+        'validate-retrieval',
+        help='Run the retrieval experiment grid on validation episodes',
+    )
+    validate_retrieval.add_argument(
+        '--events-parquet',
+        type=Path,
+        default=Path('data/processed/events.parquet'),
+    )
+    validate_retrieval.add_argument(
+        '--incidents-parquet',
+        type=Path,
+        default=Path('data/processed/incidents.parquet'),
+    )
+    validate_retrieval.add_argument(
+        '--incident-events-parquet',
+        type=Path,
+        default=Path('data/processed/incident_events.parquet'),
+    )
+    validate_retrieval.add_argument(
+        '--config',
+        type=Path,
+        default=Path('configs/default.toml'),
+    )
+    validate_retrieval.add_argument(
+        '--max-validation-queries',
+        type=int,
+        default=None,
+    )
+
     return parser
 
 
@@ -95,6 +128,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(f'baseline metadata: {artifact_paths.baselines_json}')
         print(f'code version: {code_version}')
+
+    if args.command == 'validate-retrieval':
+        settings = load_pipeline_settings(args.config)
+        experiment_results = run_validation_from_artifacts(
+            events_parquet_path=args.events_parquet,
+            incidents_parquet_path=args.incidents_parquet,
+            incident_events_parquet_path=args.incident_events_parquet,
+            pipeline_settings=settings,
+            max_validation_queries=args.max_validation_queries,
+        )
+        print(experiment_results.to_string(index=False))
+        if args.max_validation_queries is not None:
+            print(
+                'smoke-run validation query limit: '
+                f'{args.max_validation_queries}'
+            )
 
     return 0
 
