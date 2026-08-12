@@ -15,6 +15,9 @@ from industrial_alarm_copilot.incidents.artifacts import (
 from industrial_alarm_copilot.retrieval.pipeline import (
     run_validation_from_artifacts,
 )
+from industrial_alarm_copilot.retrieval.experiments import (
+    select_retrieval_diagnostics,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -91,6 +94,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
     )
+    validate_retrieval.add_argument(
+        '--diagnostics-only',
+        action='store_true',
+        help='Print compact Top-5 diagnostics as CSV',
+    )
 
     return parser
 
@@ -138,7 +146,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             pipeline_settings=settings,
             max_validation_queries=args.max_validation_queries,
         )
-        print(experiment_results.to_string(index=False))
+        if args.diagnostics_only:
+            diagnostics = select_retrieval_diagnostics(experiment_results)
+            print(diagnostics.to_csv(index=False), end='')
+        else:
+            print(experiment_results.to_string(index=False))
         if args.max_validation_queries is not None:
             print(
                 'smoke-run validation query limit: '

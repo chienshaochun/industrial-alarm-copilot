@@ -25,6 +25,20 @@ def test_validate_retrieval_command_passes_artifacts_and_query_limit(
             {
                 'selection_split': ['validation'],
                 'feature_version': ['alarm_tfidf_v1'],
+                'future_horizon_hours': [6.0],
+                'relevance_threshold': [0.3],
+                'evaluation_coverage': [0.8],
+                'relevant_candidate_query_share': [0.7],
+                'mean_relevant_candidate_share': [0.2],
+                'mean_hit_at_k': [0.6],
+                'mean_precision_at_k': [0.3],
+                'mean_expected_random_precision_at_k': [0.2],
+                'mean_precision_lift_at_k': [1.5],
+                'mean_recall_at_k': [0.01],
+                'mean_maximum_recall_at_k': [0.02],
+                'mean_recall_efficiency_at_k': [0.5],
+                'mean_reciprocal_rank': [0.4],
+                'mean_ndcg_at_k': [0.35],
             }
         )
 
@@ -47,6 +61,7 @@ def test_validate_retrieval_command_passes_artifacts_and_query_limit(
             str(config_path),
             '--max-validation-queries',
             '10',
+            '--diagnostics-only',
         ]
     )
 
@@ -60,4 +75,6 @@ def test_validate_retrieval_command_passes_artifacts_and_query_limit(
     }
     output = capsys.readouterr().out
     assert 'alarm_tfidf_v1' in output
+    assert 'recall_efficiency_at_5' in output
+    assert '0.5' in output
     assert 'smoke-run validation query limit: 10' in output

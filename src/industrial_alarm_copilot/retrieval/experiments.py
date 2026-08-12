@@ -24,6 +24,39 @@ from industrial_alarm_copilot.retrieval.search import (
 )
 
 
+RETRIEVAL_DIAGNOSTIC_COLUMN_MAP = {
+    'feature_version': 'feature_version',
+    'future_horizon_hours': 'horizon_h',
+    'relevance_threshold': 'threshold',
+    'evaluation_coverage': 'coverage',
+    'relevant_candidate_query_share': 'relevant_query_share',
+    'mean_relevant_candidate_share': 'relevant_candidate_share',
+    'mean_hit_at_k': 'hit_at_5',
+    'mean_precision_at_k': 'precision_at_5',
+    'mean_expected_random_precision_at_k': 'random_precision_at_5',
+    'mean_precision_lift_at_k': 'precision_lift_at_5',
+    'mean_recall_at_k': 'recall_at_5',
+    'mean_maximum_recall_at_k': 'max_recall_at_5',
+    'mean_recall_efficiency_at_k': 'recall_efficiency_at_5',
+    'mean_reciprocal_rank': 'mrr',
+    'mean_ndcg_at_k': 'ndcg_at_5',
+}
+
+
+def select_retrieval_diagnostics(
+    experiment_results: pd.DataFrame,
+) -> pd.DataFrame:
+    '''Select and shorten columns needed to interpret Top-5 quality.'''
+    missing_columns = set(RETRIEVAL_DIAGNOSTIC_COLUMN_MAP).difference(
+        experiment_results.columns
+    )
+    if missing_columns:
+        raise ValueError('experiment results are missing diagnostic columns')
+    return experiment_results[
+        list(RETRIEVAL_DIAGNOSTIC_COLUMN_MAP)
+    ].rename(columns=RETRIEVAL_DIAGNOSTIC_COLUMN_MAP)
+
+
 def run_validation_experiment_grid(
     incidents: pd.DataFrame,
     documents: pd.DataFrame,
