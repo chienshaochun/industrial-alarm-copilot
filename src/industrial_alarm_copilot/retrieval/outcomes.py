@@ -7,6 +7,8 @@ FUTURE_OUTCOME_COLUMNS = [
     'incident_id',
     'outcome_start_time',
     'outcome_end_time',
+    'outcome_observed_through',
+    'outcome_is_complete',
     'future_horizon_hours',
     'future_event_count',
     'distinct_future_alarm_count',
@@ -57,8 +59,10 @@ def build_future_alarm_outcomes(
 
         if machine_events is None:
             future_codes = []
+            outcome_observed_through = pd.NaT
         else:
             timestamps, alarm_codes = machine_events
+            outcome_observed_through = timestamps.iloc[-1]
             left = timestamps.searchsorted(
                 outcome_start_time,
                 side='right',
@@ -75,6 +79,11 @@ def build_future_alarm_outcomes(
                 'incident_id': str(incident.incident_id),
                 'outcome_start_time': outcome_start_time,
                 'outcome_end_time': outcome_end_time,
+                'outcome_observed_through': outcome_observed_through,
+                'outcome_is_complete': bool(
+                    pd.notna(outcome_observed_through)
+                    and outcome_observed_through >= outcome_end_time
+                ),
                 'future_horizon_hours': float(future_horizon_hours),
                 'future_event_count': len(future_codes),
                 'distinct_future_alarm_count': len(distinct_codes),

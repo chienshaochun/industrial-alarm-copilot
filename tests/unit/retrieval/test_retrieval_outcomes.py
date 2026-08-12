@@ -49,9 +49,13 @@ def test_build_future_alarm_outcomes_respects_machine_and_boundaries():
     assert outcomes.loc['inc_1', 'outcome_end_time'] == pd.Timestamp(
         '2020-01-01 11:00:00'
     )
+    assert bool(outcomes.loc['inc_1', 'outcome_is_complete']) is True
     assert outcomes.loc['inc_without_future', 'future_alarm_codes'] == ()
     assert bool(
         outcomes.loc['inc_without_future', 'has_future_alarms']
+    ) is False
+    assert bool(
+        outcomes.loc['inc_without_future', 'outcome_is_complete']
     ) is False
 
 
