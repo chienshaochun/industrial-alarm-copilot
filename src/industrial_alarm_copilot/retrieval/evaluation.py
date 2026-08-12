@@ -14,6 +14,11 @@ from industrial_alarm_copilot.retrieval.metrics import (
     BinaryRankingMetrics,
     compute_binary_ranking_metrics,
 )
+from industrial_alarm_copilot.retrieval.outcomes import (
+    OutcomeAlarmMatrix,
+    build_outcome_alarm_matrix,
+    compute_outcome_jaccard_scores,
+)
 from industrial_alarm_copilot.retrieval.relevance import (
     label_retrieval_relevance,
 )
@@ -111,6 +116,7 @@ def evaluate_retrieval_query(
     relevance_threshold: float,
     top_k: int = 5,
     policy: CandidatePolicy = 'expanding_history',
+    outcome_alarm_matrix: OutcomeAlarmMatrix | None = None,
 ) -> QueryRetrievalEvaluation:
     '''Evaluate one query against its complete historical outcome pool.'''
     if not outcomes['incident_id'].is_unique:
@@ -164,22 +170,20 @@ def evaluate_retrieval_query(
             ranked_results=_empty_ranked_results(),
         )
 
-    candidate_pairs = pd.DataFrame(
-        {
-            'query_incident_id': str(query_incident_id),
-            'candidate_incident_id': candidates[
-                'incident_id'
-            ].astype(str).to_numpy(),
-        }
-    )
-    labeled_candidate_pool = label_retrieval_relevance(
-        candidate_pairs,
-        outcomes,
-        incidents,
-        relevance_threshold,
+    if outcome_alarm_matrix is None:
+        outcome_alarm_matrix = build_outcome_alarm_matrix(outcomes)
+    candidate_incident_ids = tuple(
+        candidates['incident_id'].astype(str)
     )
     total_relevant_candidate_count = int(
-        labeled_candidate_pool['is_relevant'].sum()
+        (
+            compute_outcome_jaccard_scores(
+                outcome_alarm_matrix,
+                query_incident_id,
+                candidate_incident_ids,
+            )
+            >= relevance_threshold
+        ).sum()
     )
 
     query_row = incidents.loc[
@@ -332,6 +336,7 @@ def evaluate_retrieval_splits(
     if query_rows.empty:
         raise ValueError('query_splits must select at least one incident')
 
+    outcome_alarm_matrix = build_outcome_alarm_matrix(outcomes)
     summary_records = []
     ranked_frames = []
     for query in query_rows.itertuples(index=False):
@@ -344,6 +349,7 @@ def evaluate_retrieval_splits(
             relevance_threshold=relevance_threshold,
             top_k=top_k,
             policy=policy,
+            outcome_alarm_matrix=outcome_alarm_matrix,
         )
         summary_records.append(
             _query_evaluation_record(evaluation, str(query.split))

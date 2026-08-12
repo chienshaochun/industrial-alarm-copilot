@@ -5,6 +5,8 @@ import pytest
 
 from industrial_alarm_copilot.retrieval.outcomes import (
     build_future_alarm_outcomes,
+    build_outcome_alarm_matrix,
+    compute_outcome_jaccard_scores,
 )
 
 
@@ -77,3 +79,26 @@ def test_build_future_alarm_outcomes_rejects_nonpositive_horizon():
             events,
             future_horizon_hours=0,
         )
+
+
+def test_outcome_alarm_matrix_vectorizes_exact_jaccard_scores():
+    outcomes = pd.DataFrame(
+        {
+            'incident_id': ['query', 'candidate', 'empty'],
+            'future_alarm_codes': [
+                ('11', '98', '98'),
+                ('98', '26'),
+                (),
+            ],
+        }
+    )
+
+    outcome_matrix = build_outcome_alarm_matrix(outcomes)
+    scores = compute_outcome_jaccard_scores(
+        outcome_matrix,
+        query_incident_id='query',
+        candidate_incident_ids=('candidate', 'empty'),
+    )
+
+    assert outcome_matrix.alarm_codes == ('11', '26', '98')
+    assert scores.tolist() == pytest.approx([1 / 3, 0.0])
