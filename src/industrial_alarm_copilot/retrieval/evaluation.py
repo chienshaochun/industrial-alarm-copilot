@@ -46,6 +46,15 @@ class QueryRetrievalEvaluation:
     ranked_results: pd.DataFrame
 
 
+@dataclass(frozen=True)
+class RetrievalBatchEvaluation:
+    '''Per-query evidence and split-level evaluation summaries.'''
+
+    query_summaries: pd.DataFrame
+    ranked_results: pd.DataFrame
+    split_metrics: pd.DataFrame
+
+
 def select_outcome_evaluable_candidates(
     incidents: pd.DataFrame,
     outcomes: pd.DataFrame,
@@ -207,4 +216,151 @@ def evaluate_retrieval_query(
         total_relevant_candidate_count=total_relevant_candidate_count,
         metrics=metrics,
         ranked_results=ranked_results,
+    )
+
+
+def _query_evaluation_record(
+    evaluation: QueryRetrievalEvaluation,
+    query_split: str,
+) -> dict:
+    metrics = evaluation.metrics
+    return {
+        'query_incident_id': evaluation.query_incident_id,
+        'split': str(query_split),
+        'status': evaluation.status,
+        'k': evaluation.k,
+        'candidate_policy': evaluation.candidate_policy,
+        'feature_version': evaluation.feature_version,
+        'evaluable_candidate_count': (
+            evaluation.evaluable_candidate_count
+        ),
+        'total_relevant_candidate_count': (
+            evaluation.total_relevant_candidate_count
+        ),
+        'retrieved_count': (
+            float('nan') if metrics is None else metrics.retrieved_count
+        ),
+        'relevant_retrieved_count': (
+            float('nan')
+            if metrics is None
+            else metrics.relevant_retrieved_count
+        ),
+        'hit_at_k': (
+            float('nan') if metrics is None else float(metrics.hit_at_k)
+        ),
+        'precision_at_k': (
+            float('nan') if metrics is None else metrics.precision_at_k
+        ),
+        'recall_at_k': (
+            float('nan') if metrics is None else metrics.recall_at_k
+        ),
+        'reciprocal_rank': (
+            float('nan') if metrics is None else metrics.reciprocal_rank
+        ),
+        'ndcg_at_k': (
+            float('nan') if metrics is None else metrics.ndcg_at_k
+        ),
+    }
+
+
+def _build_split_metrics(query_summaries: pd.DataFrame) -> pd.DataFrame:
+    records = []
+    for split, split_queries in query_summaries.groupby(
+        'split',
+        observed=True,
+        sort=False,
+    ):
+        query_count = len(split_queries)
+        evaluated_mask = split_queries['status'].eq('evaluated')
+        relevant_pool_mask = (
+            evaluated_mask
+            & split_queries['total_relevant_candidate_count'].gt(0)
+        )
+        status_counts = split_queries['status'].value_counts()
+        records.append(
+            {
+                'split': str(split),
+                'query_count': query_count,
+                'evaluated_query_count': int(evaluated_mask.sum()),
+                'evaluation_coverage': float(evaluated_mask.mean()),
+                'query_outcome_incomplete_count': int(
+                    status_counts.get('query_outcome_incomplete', 0)
+                ),
+                'query_without_future_alarms_count': int(
+                    status_counts.get('query_without_future_alarms', 0)
+                ),
+                'no_evaluable_candidates_count': int(
+                    status_counts.get('no_evaluable_candidates', 0)
+                ),
+                'query_with_relevant_candidates_count': int(
+                    relevant_pool_mask.sum()
+                ),
+                'relevant_candidate_query_share': float(
+                    relevant_pool_mask.mean()
+                ),
+                'mean_hit_at_k': split_queries['hit_at_k'].mean(),
+                'mean_precision_at_k': split_queries[
+                    'precision_at_k'
+                ].mean(),
+                'mean_recall_at_k': split_queries['recall_at_k'].mean(),
+                'mean_reciprocal_rank': split_queries[
+                    'reciprocal_rank'
+                ].mean(),
+                'mean_ndcg_at_k': split_queries['ndcg_at_k'].mean(),
+            }
+        )
+    return pd.DataFrame.from_records(records)
+
+
+def evaluate_retrieval_splits(
+    incidents: pd.DataFrame,
+    documents: pd.DataFrame,
+    features: AlarmFeatureMatrix,
+    outcomes: pd.DataFrame,
+    relevance_threshold: float,
+    query_splits: tuple[str, ...] = ('validation', 'test'),
+    top_k: int = 5,
+    policy: CandidatePolicy = 'expanding_history',
+) -> RetrievalBatchEvaluation:
+    '''Evaluate every query in requested splits without dropping coverage.'''
+    query_rows = incidents.loc[
+        incidents['split'].isin(query_splits)
+    ].sort_values(
+        ['start_time', 'incident_id'],
+        kind='stable',
+    )
+    if query_rows.empty:
+        raise ValueError('query_splits must select at least one incident')
+
+    summary_records = []
+    ranked_frames = []
+    for query in query_rows.itertuples(index=False):
+        evaluation = evaluate_retrieval_query(
+            incidents,
+            documents,
+            features,
+            outcomes,
+            query_incident_id=str(query.incident_id),
+            relevance_threshold=relevance_threshold,
+            top_k=top_k,
+            policy=policy,
+        )
+        summary_records.append(
+            _query_evaluation_record(evaluation, str(query.split))
+        )
+        if not evaluation.ranked_results.empty:
+            ranked_frame = evaluation.ranked_results.copy()
+            ranked_frame.insert(1, 'query_split', str(query.split))
+            ranked_frames.append(ranked_frame)
+
+    query_summaries = pd.DataFrame.from_records(summary_records)
+    ranked_results = (
+        pd.concat(ranked_frames, ignore_index=True)
+        if ranked_frames
+        else _empty_ranked_results()
+    )
+    return RetrievalBatchEvaluation(
+        query_summaries=query_summaries,
+        ranked_results=ranked_results,
+        split_metrics=_build_split_metrics(query_summaries),
     )

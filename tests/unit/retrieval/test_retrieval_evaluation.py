@@ -5,6 +5,7 @@ import pytest
 
 from industrial_alarm_copilot.retrieval.evaluation import (
     evaluate_retrieval_query,
+    evaluate_retrieval_splits,
     select_outcome_evaluable_candidates,
 )
 from industrial_alarm_copilot.retrieval.features import (
@@ -77,14 +78,16 @@ def _build_query_evaluation_inputs():
                 'candidate_irrelevant',
                 'candidate_outcome_too_recent',
                 'query',
+                'query_incomplete',
             ],
-            'machine_id': ['4', '6', '7', '4'],
+            'machine_id': ['4', '6', '7', '4', '9'],
             'start_time': pd.to_datetime(
                 [
                     '2020-01-01 07:00:00',
                     '2020-01-01 08:00:00',
                     '2020-01-01 09:00:00',
                     '2020-01-01 10:00:00',
+                    '2020-01-01 12:00:00',
                 ]
             ),
             'end_time': pd.to_datetime(
@@ -93,15 +96,22 @@ def _build_query_evaluation_inputs():
                     '2020-01-01 08:30:00',
                     '2020-01-01 09:30:00',
                     '2020-01-01 10:30:00',
+                    '2020-01-01 12:30:00',
                 ]
             ),
-            'split': ['train', 'train', 'train', 'test'],
+            'split': ['train', 'train', 'train', 'test', 'test'],
         }
     )
     documents = pd.DataFrame(
         {
             'incident_id': incidents['incident_id'],
-            'alarm_document': ['26', '98 11', '98 11', '98 11'],
+            'alarm_document': [
+                '26',
+                '98 11',
+                '98 11',
+                '98 11',
+                '98',
+            ],
         }
     )
     fitted_tfidf = fit_alarm_tfidf(documents, incidents)
@@ -115,15 +125,17 @@ def _build_query_evaluation_inputs():
                     '2020-01-01 09:30:00',
                     '2020-01-01 10:00:00',
                     '2020-01-01 11:30:00',
+                    '2020-01-01 13:30:00',
                 ]
             ),
-            'outcome_is_complete': [True, True, True, True],
-            'has_future_alarms': [True, True, True, True],
+            'outcome_is_complete': [True, True, True, True, False],
+            'has_future_alarms': [True, True, True, True, False],
             'future_alarm_codes': [
                 ('11', '98'),
                 ('26',),
                 ('11', '98'),
                 ('11', '98'),
+                (),
             ],
         }
     )
@@ -184,3 +196,35 @@ def test_evaluate_retrieval_query_preserves_incomplete_query_coverage():
     assert evaluation.status == 'query_outcome_incomplete'
     assert evaluation.metrics is None
     assert evaluation.ranked_results.empty
+
+
+def test_evaluate_retrieval_splits_reports_scores_and_coverage():
+    incidents, documents, features, outcomes = (
+        _build_query_evaluation_inputs()
+    )
+
+    batch = evaluate_retrieval_splits(
+        incidents,
+        documents,
+        features,
+        outcomes,
+        relevance_threshold=0.5,
+        query_splits=('test',),
+        top_k=5,
+    )
+
+    assert batch.query_summaries['status'].tolist() == [
+        'evaluated',
+        'query_outcome_incomplete',
+    ]
+    assert batch.ranked_results['query_incident_id'].unique().tolist() == [
+        'query'
+    ]
+    split_metrics = batch.split_metrics.iloc[0]
+    assert split_metrics['query_count'] == 2
+    assert split_metrics['evaluated_query_count'] == 1
+    assert split_metrics['evaluation_coverage'] == pytest.approx(0.5)
+    assert split_metrics['query_outcome_incomplete_count'] == 1
+    assert split_metrics['query_with_relevant_candidates_count'] == 1
+    assert split_metrics['mean_hit_at_k'] == pytest.approx(1.0)
+    assert split_metrics['mean_precision_at_k'] == pytest.approx(1 / 5)
