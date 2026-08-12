@@ -3,6 +3,9 @@
 import pandas as pd
 
 import industrial_alarm_copilot.__main__ as cli
+from industrial_alarm_copilot.retrieval.artifacts import (
+    RetrievalValidationArtifactPaths,
+)
 
 
 def test_validate_retrieval_command_passes_artifacts_and_query_limit(
@@ -16,8 +19,10 @@ def test_validate_retrieval_command_passes_artifacts_and_query_limit(
     config_path = tmp_path / 'default.toml'
     settings = {'retrieval': {'top_k': 5}}
     received = {}
+    received_artifact = {}
 
     monkeypatch.setattr(cli, 'load_pipeline_settings', lambda path: settings)
+    monkeypatch.setattr(cli, 'get_git_commit', lambda path: 'abc1234')
 
     def fake_run_validation_from_artifacts(**kwargs):
         received.update(kwargs)
@@ -48,6 +53,23 @@ def test_validate_retrieval_command_passes_artifacts_and_query_limit(
         fake_run_validation_from_artifacts,
     )
 
+    def fake_write_retrieval_validation_artifacts(
+        experiment_results,
+        **kwargs,
+    ):
+        received_artifact['experiment_results'] = experiment_results
+        received_artifact.update(kwargs)
+        return RetrievalValidationArtifactPaths(
+            results_csv=tmp_path / 'retrieval_validation_results.csv',
+            metadata_json=tmp_path / 'retrieval_validation.metadata.json',
+        )
+
+    monkeypatch.setattr(
+        cli,
+        'write_retrieval_validation_artifacts',
+        fake_write_retrieval_validation_artifacts,
+    )
+
     exit_code = cli.main(
         [
             'validate-retrieval',
@@ -62,6 +84,8 @@ def test_validate_retrieval_command_passes_artifacts_and_query_limit(
             '--max-validation-queries',
             '10',
             '--diagnostics-only',
+            '--output-dir',
+            str(tmp_path),
         ]
     )
 
@@ -73,8 +97,20 @@ def test_validate_retrieval_command_passes_artifacts_and_query_limit(
         'pipeline_settings': settings,
         'max_validation_queries': 10,
     }
+    assert received_artifact['source_paths'] == {
+        'events': events_path,
+        'incidents': incidents_path,
+        'incident_events': incident_events_path,
+    }
+    assert received_artifact['retrieval_settings'] == settings['retrieval']
+    assert received_artifact['code_version'] == 'abc1234'
+    assert received_artifact['output_dir'] == tmp_path
+    assert received_artifact['query_limit'] == 10
     output = capsys.readouterr().out
     assert 'alarm_tfidf_v1' in output
     assert 'recall_efficiency_at_5' in output
     assert '0.5' in output
     assert 'smoke-run validation query limit: 10' in output
+    assert 'retrieval_validation_results.csv' in output
+    assert 'retrieval_validation.metadata.json' in output
+    assert 'abc1234' in output

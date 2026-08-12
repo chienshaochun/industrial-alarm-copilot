@@ -18,6 +18,9 @@ from industrial_alarm_copilot.retrieval.pipeline import (
 from industrial_alarm_copilot.retrieval.experiments import (
     select_retrieval_diagnostics,
 )
+from industrial_alarm_copilot.retrieval.artifacts import (
+    write_retrieval_validation_artifacts,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -99,6 +102,12 @@ def build_parser() -> argparse.ArgumentParser:
         action='store_true',
         help='Print compact Top-5 diagnostics as CSV',
     )
+    validate_retrieval.add_argument(
+        '--output-dir',
+        type=Path,
+        default=None,
+        help='Optionally write validation CSV and metadata artifacts',
+    )
 
     return parser
 
@@ -151,6 +160,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(diagnostics.to_csv(index=False), end='')
         else:
             print(experiment_results.to_string(index=False))
+        if args.output_dir is not None:
+            code_version = get_git_commit(Path.cwd())
+            artifact_paths = write_retrieval_validation_artifacts(
+                experiment_results,
+                source_paths={
+                    'events': args.events_parquet,
+                    'incidents': args.incidents_parquet,
+                    'incident_events': args.incident_events_parquet,
+                },
+                retrieval_settings=settings['retrieval'],
+                code_version=code_version,
+                output_dir=args.output_dir,
+                query_limit=args.max_validation_queries,
+            )
+            print(f'retrieval results artifact: {artifact_paths.results_csv}')
+            print(
+                'retrieval metadata artifact: '
+                f'{artifact_paths.metadata_json}'
+            )
+            print(f'code version: {code_version}')
         if args.max_validation_queries is not None:
             print(
                 'smoke-run validation query limit: '
