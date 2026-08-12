@@ -9,6 +9,9 @@ from industrial_alarm_copilot.data.runtime import (
     get_git_commit,
     load_pipeline_settings,
 )
+from industrial_alarm_copilot.incidents.artifacts import (
+    prepare_incident_artifacts,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,6 +39,26 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path("data/processed"),
     )
 
+    prepare_incidents = commands.add_parser(
+        'prepare-incidents',
+        help='Build incident analysis artifacts from processed events',
+    )
+    prepare_incidents.add_argument(
+        '--events-parquet',
+        type=Path,
+        default=Path('data/processed/events.parquet'),
+    )
+    prepare_incidents.add_argument(
+        '--config',
+        type=Path,
+        default=Path('configs/default.toml'),
+    )
+    prepare_incidents.add_argument(
+        '--output-dir',
+        type=Path,
+        default=Path('data/processed'),
+    )
+
     return parser
 
 
@@ -55,6 +78,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"events artifact: {artifact_paths.events_parquet}")
         print(f"metadata artifact: {artifact_paths.metadata_json}")
         print(f"code version: {code_version}")
+
+    if args.command == 'prepare-incidents':
+        settings = load_pipeline_settings(args.config)
+        code_version = get_git_commit(Path.cwd())
+        artifact_paths = prepare_incident_artifacts(
+            events_parquet_path=args.events_parquet,
+            output_dir=args.output_dir,
+            pipeline_settings=settings,
+            code_version=code_version,
+        )
+        print(f'incidents artifact: {artifact_paths.incidents_parquet}')
+        print(
+            'incident events artifact: '
+            f'{artifact_paths.incident_events_parquet}'
+        )
+        print(f'baseline metadata: {artifact_paths.baselines_json}')
+        print(f'code version: {code_version}')
 
     return 0
 
