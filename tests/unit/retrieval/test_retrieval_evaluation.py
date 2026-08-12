@@ -6,6 +6,8 @@ import pytest
 from industrial_alarm_copilot.retrieval.evaluation import (
     evaluate_retrieval_query,
     evaluate_retrieval_splits,
+    prepare_retrieval_query_evidence,
+    score_retrieval_query_evidence,
     select_outcome_evaluable_candidates,
 )
 from industrial_alarm_copilot.retrieval.features import (
@@ -228,3 +230,40 @@ def test_evaluate_retrieval_splits_reports_scores_and_coverage():
     assert split_metrics['query_with_relevant_candidates_count'] == 1
     assert split_metrics['mean_hit_at_k'] == pytest.approx(1.0)
     assert split_metrics['mean_precision_at_k'] == pytest.approx(1 / 5)
+
+
+def test_query_evidence_can_be_rescored_without_retrieval():
+    incidents, documents, features, outcomes = (
+        _build_query_evaluation_inputs()
+    )
+    outcomes.loc[
+        outcomes['incident_id'].eq('candidate_relevant'),
+        'future_alarm_codes',
+    ] = pd.Series(
+        [('98', '26')],
+        index=outcomes.index[
+            outcomes['incident_id'].eq('candidate_relevant')
+        ],
+        dtype='object',
+    )
+
+    evidence = prepare_retrieval_query_evidence(
+        incidents,
+        documents,
+        features,
+        outcomes,
+        query_incident_id='query',
+        top_k=5,
+    )
+    loose = score_retrieval_query_evidence(evidence, 0.3)
+    strict = score_retrieval_query_evidence(evidence, 0.5)
+
+    assert loose.ranked_results['candidate_incident_id'].tolist() == (
+        strict.ranked_results['candidate_incident_id'].tolist()
+    )
+    assert loose.total_relevant_candidate_count == 1
+    assert strict.total_relevant_candidate_count == 0
+    assert loose.metrics is not None
+    assert strict.metrics is not None
+    assert loose.metrics.hit_at_k is True
+    assert strict.metrics.hit_at_k is False

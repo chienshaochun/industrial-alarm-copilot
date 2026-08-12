@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
+import numpy as np
 import pandas as pd
 
 from industrial_alarm_copilot.retrieval.candidates import (
@@ -19,9 +20,7 @@ from industrial_alarm_copilot.retrieval.outcomes import (
     build_outcome_alarm_matrix,
     compute_outcome_jaccard_scores,
 )
-from industrial_alarm_copilot.retrieval.relevance import (
-    label_retrieval_relevance,
-)
+from industrial_alarm_copilot.retrieval.relevance import RELEVANCE_COLUMNS
 from industrial_alarm_copilot.retrieval.search import (
     RETRIEVAL_RESULT_COLUMNS,
     retrieve_similar_episodes,
@@ -48,6 +47,20 @@ class QueryRetrievalEvaluation:
     evaluable_candidate_count: int
     total_relevant_candidate_count: int
     metrics: BinaryRankingMetrics | None
+    ranked_results: pd.DataFrame
+
+
+@dataclass(frozen=True)
+class QueryRetrievalEvidence:
+    '''Threshold-independent candidates, ranking, and outcome overlap.'''
+
+    query_incident_id: str
+    status: QueryEvaluationStatus
+    k: int
+    candidate_policy: CandidatePolicy
+    feature_version: str
+    evaluable_candidate_count: int
+    candidate_outcome_jaccard: np.ndarray
     ranked_results: pd.DataFrame
 
 
@@ -107,18 +120,19 @@ def _empty_ranked_results() -> pd.DataFrame:
     return pd.DataFrame(columns=RETRIEVAL_RESULT_COLUMNS)
 
 
-def evaluate_retrieval_query(
+def prepare_retrieval_query_evidence(
     incidents: pd.DataFrame,
     documents: pd.DataFrame,
     features: AlarmFeatureMatrix,
     outcomes: pd.DataFrame,
     query_incident_id: str,
-    relevance_threshold: float,
     top_k: int = 5,
     policy: CandidatePolicy = 'expanding_history',
     outcome_alarm_matrix: OutcomeAlarmMatrix | None = None,
-) -> QueryRetrievalEvaluation:
-    '''Evaluate one query against its complete historical outcome pool.'''
+) -> QueryRetrievalEvidence:
+    '''Prepare one query once so multiple thresholds can reuse evidence.'''
+    if top_k <= 0:
+        raise ValueError('top_k must be greater than zero')
     if not outcomes['incident_id'].is_unique:
         raise ValueError('outcomes incident_id must be unique')
 
@@ -136,21 +150,19 @@ def evaluate_retrieval_query(
         'feature_version': features.feature_version,
     }
     if not bool(query_outcome['outcome_is_complete']):
-        return QueryRetrievalEvaluation(
+        return QueryRetrievalEvidence(
             **base_result,
             status='query_outcome_incomplete',
             evaluable_candidate_count=0,
-            total_relevant_candidate_count=0,
-            metrics=None,
+            candidate_outcome_jaccard=np.asarray([], dtype=float),
             ranked_results=_empty_ranked_results(),
         )
     if not bool(query_outcome['has_future_alarms']):
-        return QueryRetrievalEvaluation(
+        return QueryRetrievalEvidence(
             **base_result,
             status='query_without_future_alarms',
             evaluable_candidate_count=0,
-            total_relevant_candidate_count=0,
-            metrics=None,
+            candidate_outcome_jaccard=np.asarray([], dtype=float),
             ranked_results=_empty_ranked_results(),
         )
 
@@ -161,12 +173,11 @@ def evaluate_retrieval_query(
         policy=policy,
     )
     if candidates.empty:
-        return QueryRetrievalEvaluation(
+        return QueryRetrievalEvidence(
             **base_result,
             status='no_evaluable_candidates',
             evaluable_candidate_count=0,
-            total_relevant_candidate_count=0,
-            metrics=None,
+            candidate_outcome_jaccard=np.asarray([], dtype=float),
             ranked_results=_empty_ranked_results(),
         )
 
@@ -175,15 +186,10 @@ def evaluate_retrieval_query(
     candidate_incident_ids = tuple(
         candidates['incident_id'].astype(str)
     )
-    total_relevant_candidate_count = int(
-        (
-            compute_outcome_jaccard_scores(
-                outcome_alarm_matrix,
-                query_incident_id,
-                candidate_incident_ids,
-            )
-            >= relevance_threshold
-        ).sum()
+    candidate_outcome_jaccard = compute_outcome_jaccard_scores(
+        outcome_alarm_matrix,
+        query_incident_id,
+        candidate_incident_ids,
     )
 
     query_row = incidents.loc[
@@ -201,26 +207,101 @@ def evaluate_retrieval_query(
         top_k=top_k,
         policy=policy,
     )
-    ranked_results = label_retrieval_relevance(
-        ranked_results,
-        outcomes,
-        incidents,
-        relevance_threshold,
+    score_by_candidate_id = dict(
+        zip(candidate_incident_ids, candidate_outcome_jaccard, strict=True)
     )
+    ranked_results['outcome_jaccard'] = [
+        score_by_candidate_id[str(candidate_id)]
+        for candidate_id in ranked_results['candidate_incident_id']
+    ]
+
+    return QueryRetrievalEvidence(
+        **base_result,
+        status='evaluated',
+        evaluable_candidate_count=len(candidates),
+        candidate_outcome_jaccard=candidate_outcome_jaccard,
+        ranked_results=ranked_results,
+    )
+
+
+def score_retrieval_query_evidence(
+    evidence: QueryRetrievalEvidence,
+    relevance_threshold: float,
+) -> QueryRetrievalEvaluation:
+    '''Apply one relevance threshold without repeating retrieval.'''
+    if not 0 < relevance_threshold <= 1:
+        raise ValueError('relevance_threshold must be in (0, 1]')
+
+    base_result = {
+        'query_incident_id': evidence.query_incident_id,
+        'status': evidence.status,
+        'k': evidence.k,
+        'candidate_policy': evidence.candidate_policy,
+        'feature_version': evidence.feature_version,
+        'evaluable_candidate_count': evidence.evaluable_candidate_count,
+    }
+    if evidence.status != 'evaluated':
+        return QueryRetrievalEvaluation(
+            **base_result,
+            total_relevant_candidate_count=0,
+            metrics=None,
+            ranked_results=evidence.ranked_results.copy(),
+        )
+
+    total_relevant_candidate_count = int(
+        (evidence.candidate_outcome_jaccard >= relevance_threshold).sum()
+    )
+    ranked_results = evidence.ranked_results.copy()
+    ranked_results['query_outcome_is_complete'] = True
+    ranked_results['query_has_future_alarms'] = True
+    ranked_results['candidate_outcome_is_complete'] = True
+    ranked_results['candidate_outcome_available_before_query'] = True
+    ranked_results['evaluation_eligible'] = True
+    ranked_results['relevance_threshold'] = float(relevance_threshold)
+    ranked_results['is_relevant'] = pd.array(
+        ranked_results['outcome_jaccard'].ge(relevance_threshold),
+        dtype='boolean',
+    )
+    ranked_results = ranked_results[
+        RETRIEVAL_RESULT_COLUMNS + RELEVANCE_COLUMNS
+    ]
     metrics = compute_binary_ranking_metrics(
         ranked_results['is_relevant'],
-        k=top_k,
+        k=evidence.k,
         total_relevant_candidate_count=total_relevant_candidate_count,
     )
 
     return QueryRetrievalEvaluation(
         **base_result,
-        status='evaluated',
-        evaluable_candidate_count=len(candidates),
         total_relevant_candidate_count=total_relevant_candidate_count,
         metrics=metrics,
         ranked_results=ranked_results,
     )
+
+
+def evaluate_retrieval_query(
+    incidents: pd.DataFrame,
+    documents: pd.DataFrame,
+    features: AlarmFeatureMatrix,
+    outcomes: pd.DataFrame,
+    query_incident_id: str,
+    relevance_threshold: float,
+    top_k: int = 5,
+    policy: CandidatePolicy = 'expanding_history',
+    outcome_alarm_matrix: OutcomeAlarmMatrix | None = None,
+) -> QueryRetrievalEvaluation:
+    '''Evaluate one query against its complete historical outcome pool.'''
+    evidence = prepare_retrieval_query_evidence(
+        incidents,
+        documents,
+        features,
+        outcomes,
+        query_incident_id,
+        top_k=top_k,
+        policy=policy,
+        outcome_alarm_matrix=outcome_alarm_matrix,
+    )
+    return score_retrieval_query_evidence(evidence, relevance_threshold)
 
 
 def _query_evaluation_record(
