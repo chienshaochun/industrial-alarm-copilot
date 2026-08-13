@@ -13,12 +13,14 @@ from industrial_alarm_copilot.incidents.artifacts import (
     prepare_incident_artifacts,
 )
 from industrial_alarm_copilot.retrieval.pipeline import (
+    run_selected_test_from_artifacts,
     run_validation_from_artifacts,
 )
 from industrial_alarm_copilot.retrieval.experiments import (
     select_retrieval_diagnostics,
 )
 from industrial_alarm_copilot.retrieval.artifacts import (
+    write_retrieval_test_artifacts,
     write_retrieval_validation_artifacts,
 )
 
@@ -109,6 +111,36 @@ def build_parser() -> argparse.ArgumentParser:
         help='Optionally write validation CSV and metadata artifacts',
     )
 
+    test_retrieval = commands.add_parser(
+        'test-retrieval',
+        help='Evaluate the locked retrieval setting on test episodes',
+    )
+    test_retrieval.add_argument(
+        '--events-parquet',
+        type=Path,
+        default=Path('data/processed/events.parquet'),
+    )
+    test_retrieval.add_argument(
+        '--incidents-parquet',
+        type=Path,
+        default=Path('data/processed/incidents.parquet'),
+    )
+    test_retrieval.add_argument(
+        '--incident-events-parquet',
+        type=Path,
+        default=Path('data/processed/incident_events.parquet'),
+    )
+    test_retrieval.add_argument(
+        '--config',
+        type=Path,
+        default=Path('configs/default.toml'),
+    )
+    test_retrieval.add_argument(
+        '--output-dir',
+        type=Path,
+        default=Path('data/processed'),
+    )
+
     return parser
 
 
@@ -185,6 +217,36 @@ def main(argv: Sequence[str] | None = None) -> int:
                 'smoke-run validation query limit: '
                 f'{args.max_validation_queries}'
             )
+
+    if args.command == 'test-retrieval':
+        settings = load_pipeline_settings(args.config)
+        test_results = run_selected_test_from_artifacts(
+            events_parquet_path=args.events_parquet,
+            incidents_parquet_path=args.incidents_parquet,
+            incident_events_parquet_path=args.incident_events_parquet,
+            pipeline_settings=settings,
+        )
+        diagnostics = select_retrieval_diagnostics(test_results)
+        print(diagnostics.to_csv(index=False), end='')
+
+        code_version = get_git_commit(Path.cwd())
+        artifact_paths = write_retrieval_test_artifacts(
+            test_results,
+            source_paths={
+                'events': args.events_parquet,
+                'incidents': args.incidents_parquet,
+                'incident_events': args.incident_events_parquet,
+            },
+            retrieval_settings=settings['retrieval'],
+            code_version=code_version,
+            output_dir=args.output_dir,
+        )
+        print(f'retrieval test artifact: {artifact_paths.results_csv}')
+        print(
+            'retrieval test metadata: '
+            f'{artifact_paths.metadata_json}'
+        )
+        print(f'code version: {code_version}')
 
     return 0
 

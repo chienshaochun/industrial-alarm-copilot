@@ -1,4 +1,4 @@
-'''Artifact loading and orchestration for retrieval validation experiments.'''
+'''Artifact loading and orchestration for retrieval experiments.'''
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,6 +10,7 @@ from industrial_alarm_copilot.retrieval.documents import (
     build_alarm_documents,
 )
 from industrial_alarm_copilot.retrieval.experiments import (
+    run_selected_test_evaluation,
     run_validation_experiment_grid,
 )
 from industrial_alarm_copilot.retrieval.settings import (
@@ -73,4 +74,27 @@ def run_validation_from_artifacts(
         inputs.events,
         retrieval_settings,
         max_validation_queries=max_validation_queries,
+    )
+
+
+def run_selected_test_from_artifacts(
+    events_parquet_path: str | Path,
+    incidents_parquet_path: str | Path,
+    incident_events_parquet_path: str | Path,
+    pipeline_settings: dict[str, Any],
+) -> pd.DataFrame:
+    '''Run the locked retrieval setting on test artifacts.'''
+    inputs = load_retrieval_experiment_inputs(
+        events_parquet_path,
+        incidents_parquet_path,
+        incident_events_parquet_path,
+    )
+    retrieval_settings = parse_retrieval_settings(
+        pipeline_settings['retrieval']
+    )
+    return run_selected_test_evaluation(
+        inputs.incidents,
+        inputs.documents,
+        inputs.events,
+        retrieval_settings,
     )

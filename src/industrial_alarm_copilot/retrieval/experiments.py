@@ -1,4 +1,4 @@
-'''Validation-only retrieval experiment grid.'''
+'''Validation selection and locked test evaluation experiments.'''
 
 import pandas as pd
 
@@ -6,6 +6,7 @@ from industrial_alarm_copilot.retrieval.evaluation import (
     build_retrieval_evaluation_index,
     build_query_evaluation_record,
     build_split_metrics,
+    evaluate_retrieval_splits,
     prepare_retrieval_query_evidence,
     score_retrieval_query_evidence,
 )
@@ -152,3 +153,71 @@ def run_validation_experiment_grid(
                 )
 
     return pd.DataFrame.from_records(experiment_records)
+
+
+def run_selected_test_evaluation(
+    incidents: pd.DataFrame,
+    documents: pd.DataFrame,
+    events: pd.DataFrame,
+    settings: RetrievalExperimentSettings,
+) -> pd.DataFrame:
+    '''Evaluate the validation-selected retrieval settings on test once.'''
+    if (
+        settings.selected_feature_version is None
+        or settings.future_horizon_hours is None
+        or settings.relevance_threshold is None
+    ):
+        raise ValueError('selected retrieval settings are required')
+
+    feature_variants = build_retrieval_feature_variants(
+        documents,
+        incidents,
+        alarm_weight=settings.alarm_weight,
+        shape_weight=settings.shape_weight,
+    )
+    try:
+        selected_features = feature_variants[
+            settings.selected_feature_version
+        ]
+    except KeyError as error:
+        raise ValueError('selected feature version is unavailable') from error
+
+    outcomes = build_future_alarm_outcomes(
+        incidents,
+        events,
+        future_horizon_hours=settings.future_horizon_hours,
+    )
+    evaluation = evaluate_retrieval_splits(
+        incidents,
+        documents,
+        selected_features,
+        outcomes,
+        relevance_threshold=settings.relevance_threshold,
+        query_splits=('test',),
+        top_k=settings.top_k,
+        policy=settings.candidate_policy,
+    )
+    split_metrics = evaluation.split_metrics.iloc[0]
+    if split_metrics['split'] != 'test':
+        raise ValueError('selected evaluation must contain only test queries')
+
+    return pd.DataFrame.from_records(
+        [
+            {
+                'evaluation_split': 'test',
+                'feature_version': settings.selected_feature_version,
+                'future_horizon_hours': settings.future_horizon_hours,
+                'relevance_threshold': settings.relevance_threshold,
+                'top_k': settings.top_k,
+                'candidate_policy': settings.candidate_policy,
+                'alarm_weight': settings.alarm_weight,
+                'shape_weight': (
+                    0.0
+                    if settings.selected_feature_version
+                    == 'alarm_tfidf_v1'
+                    else settings.shape_weight
+                ),
+                **split_metrics.drop(labels='split').to_dict(),
+            }
+        ]
+    )
