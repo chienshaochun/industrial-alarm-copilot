@@ -29,6 +29,8 @@ def _settings():
         'sequence_weight_candidates': ['none', 'balanced_capped'],
         'sequence_positive_weight_cap': 20.0,
         'random_seed': 0,
+        'selection_macro_f1_tolerance': 0.01,
+        'selected_model_version': 'transition_frequency_v1',
     }
 
 
@@ -49,6 +51,8 @@ def test_parse_forecast_settings_preserves_selected_contract():
     assert parsed.sequence_hidden_dim == 48
     assert parsed.sequence_weight_candidates == ('none', 'balanced_capped')
     assert parsed.random_seed == 0
+    assert parsed.selection_macro_f1_tolerance == 0.01
+    assert parsed.selected_model_version == 'transition_frequency_v1'
 
 
 def test_parse_forecast_settings_rejects_unstudied_horizon():

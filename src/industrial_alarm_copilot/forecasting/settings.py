@@ -29,6 +29,8 @@ class ForecastExperimentSettings:
     sequence_weight_candidates: tuple[str, ...]
     sequence_positive_weight_cap: float
     random_seed: int
+    selection_macro_f1_tolerance: float
+    selected_model_version: str
 
 
 def parse_forecast_settings(
@@ -68,6 +70,10 @@ def parse_forecast_settings(
     )
     sequence_positive_weight_cap = float(settings['sequence_positive_weight_cap'])
     random_seed = int(settings['random_seed'])
+    selection_macro_f1_tolerance = float(
+        settings['selection_macro_f1_tolerance']
+    )
+    selected_model_version = str(settings['selected_model_version'])
 
     if top_k <= 0:
         raise ValueError('forecast top_k must be greater than zero')
@@ -123,6 +129,13 @@ def parse_forecast_settings(
         or sequence_positive_weight_cap < 1
     ):
         raise ValueError('sequence positive weight cap must be at least one')
+    if (
+        not math.isfinite(selection_macro_f1_tolerance)
+        or selection_macro_f1_tolerance < 0
+    ):
+        raise ValueError('selection macro F1 tolerance must be nonnegative')
+    if selected_model_version != 'transition_frequency_v1':
+        raise ValueError('selected forecasting model is not supported')
 
     return ForecastExperimentSettings(
         top_k=top_k,
@@ -145,4 +158,6 @@ def parse_forecast_settings(
         sequence_weight_candidates=sequence_weight_candidates,
         sequence_positive_weight_cap=sequence_positive_weight_cap,
         random_seed=random_seed,
+        selection_macro_f1_tolerance=selection_macro_f1_tolerance,
+        selected_model_version=selected_model_version,
     )

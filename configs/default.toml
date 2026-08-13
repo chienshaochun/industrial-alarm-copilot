@@ -38,6 +38,8 @@ sequence_learning_rate = 0.001
 sequence_weight_candidates = ['none', 'balanced_capped']
 sequence_positive_weight_cap = 20.0
 random_seed = 0
+selection_macro_f1_tolerance = 0.01
+selected_model_version = 'transition_frequency_v1'
 
 [split]
 strategy = "per_machine_unique_timestamp"
