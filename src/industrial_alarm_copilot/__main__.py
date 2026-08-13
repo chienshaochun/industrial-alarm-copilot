@@ -23,6 +23,12 @@ from industrial_alarm_copilot.retrieval.artifacts import (
     write_retrieval_test_artifacts,
     write_retrieval_validation_artifacts,
 )
+from industrial_alarm_copilot.forecasting.artifacts import (
+    write_forecast_test_artifacts,
+)
+from industrial_alarm_copilot.forecasting.pipeline import (
+    run_selected_forecast_from_artifacts,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -141,6 +147,36 @@ def build_parser() -> argparse.ArgumentParser:
         default=Path('data/processed'),
     )
 
+    test_forecast = commands.add_parser(
+        'test-forecast',
+        help='Evaluate the locked future-alarm model on test episodes',
+    )
+    test_forecast.add_argument(
+        '--events-parquet',
+        type=Path,
+        default=Path('data/processed/events.parquet'),
+    )
+    test_forecast.add_argument(
+        '--incidents-parquet',
+        type=Path,
+        default=Path('data/processed/incidents.parquet'),
+    )
+    test_forecast.add_argument(
+        '--incident-events-parquet',
+        type=Path,
+        default=Path('data/processed/incident_events.parquet'),
+    )
+    test_forecast.add_argument(
+        '--config',
+        type=Path,
+        default=Path('configs/default.toml'),
+    )
+    test_forecast.add_argument(
+        '--output-dir',
+        type=Path,
+        default=Path('data/processed'),
+    )
+
     return parser
 
 
@@ -246,6 +282,37 @@ def main(argv: Sequence[str] | None = None) -> int:
             'retrieval test metadata: '
             f'{artifact_paths.metadata_json}'
         )
+        print(f'code version: {code_version}')
+
+    if args.command == 'test-forecast':
+        settings = load_pipeline_settings(args.config)
+        run = run_selected_forecast_from_artifacts(
+            events_parquet_path=args.events_parquet,
+            incidents_parquet_path=args.incidents_parquet,
+            incident_events_parquet_path=args.incident_events_parquet,
+            pipeline_settings=settings,
+            evaluation_split='test',
+        )
+        print(run.evaluation.split_metrics.to_csv(index=False), end='')
+        print('SUPPORT GROUPS')
+        print(run.support_group_metrics.to_csv(index=False), end='')
+        print('BASELINE SCOPE')
+        print(run.scope_profile.to_csv(index=False), end='')
+        code_version = get_git_commit(Path.cwd())
+        paths = write_forecast_test_artifacts(
+            run,
+            source_paths={
+                'events': args.events_parquet,
+                'incidents': args.incidents_parquet,
+                'incident_events': args.incident_events_parquet,
+            },
+            forecast_settings=settings['forecasting'],
+            code_version=code_version,
+            output_dir=args.output_dir,
+        )
+        print(f'forecast test artifact: {paths.test_results_csv}')
+        print(f'forecast model artifact: {paths.model_json}')
+        print(f'forecast metadata: {paths.metadata_json}')
         print(f'code version: {code_version}')
 
     return 0
