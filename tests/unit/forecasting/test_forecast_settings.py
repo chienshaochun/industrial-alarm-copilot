@@ -14,6 +14,7 @@ def _settings():
         'selected_forecast_horizon_hours': 6,
         'rare_max_train_support': 49,
         'common_min_train_support': 500,
+        'minimum_machine_train_samples': 200,
     }
 
 
@@ -25,6 +26,7 @@ def test_parse_forecast_settings_preserves_selected_contract():
     assert parsed.selected_forecast_horizon_hours == 6.0
     assert parsed.rare_max_train_support == 49
     assert parsed.common_min_train_support == 500
+    assert parsed.minimum_machine_train_samples == 200
 
 
 def test_parse_forecast_settings_rejects_unstudied_horizon():

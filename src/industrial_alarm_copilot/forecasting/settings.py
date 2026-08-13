@@ -14,6 +14,7 @@ class ForecastExperimentSettings:
     selected_forecast_horizon_hours: float
     rare_max_train_support: int
     common_min_train_support: int
+    minimum_machine_train_samples: int
 
 
 def parse_forecast_settings(
@@ -30,6 +31,9 @@ def parse_forecast_settings(
     )
     rare_max_support = int(settings['rare_max_train_support'])
     common_min_support = int(settings['common_min_train_support'])
+    minimum_machine_samples = int(
+        settings['minimum_machine_train_samples']
+    )
 
     if top_k <= 0:
         raise ValueError('forecast top_k must be greater than zero')
@@ -47,6 +51,8 @@ def parse_forecast_settings(
         raise ValueError(
             'common support boundary must leave a medium support range'
         )
+    if minimum_machine_samples < 1:
+        raise ValueError('minimum machine train samples must be positive')
 
     return ForecastExperimentSettings(
         top_k=top_k,
@@ -54,4 +60,5 @@ def parse_forecast_settings(
         selected_forecast_horizon_hours=selected_horizon,
         rare_max_train_support=rare_max_support,
         common_min_train_support=common_min_support,
+        minimum_machine_train_samples=minimum_machine_samples,
     )

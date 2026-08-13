@@ -5,8 +5,10 @@ import pytest
 
 from industrial_alarm_copilot.forecasting.baselines import (
     fit_global_frequency_baseline,
+    fit_machine_frequency_baseline,
     rank_global_frequency_baseline,
     score_global_frequency_baseline,
+    score_machine_frequency_baseline,
 )
 from industrial_alarm_copilot.forecasting.evaluation import (
     evaluate_forecast_scores,
@@ -111,3 +113,100 @@ def test_global_frequency_validation_metrics_preserve_empty_coverage():
     assert pd.isna(metrics['mean_recall_at_k'])
     assert pd.isna(metrics['macro_f1_at_k'])
     assert metrics['evaluated_label_count'] == 0
+
+
+def test_machine_frequency_baseline_conditions_and_falls_back():
+    labels = pd.DataFrame(
+        {
+            'incident_id': [
+                'm4_train_a',
+                'm4_train_b',
+                'm9_train_a',
+                'm9_train_b',
+                'm19_train',
+                'm4_validation',
+                'm9_validation',
+                'm19_validation',
+                'unseen_validation',
+            ],
+            'machine_id': ['4', '4', '9', '9', '19', '4', '9', '19', '20'],
+            'split': [
+                'train',
+                'train',
+                'train',
+                'train',
+                'train',
+                'validation',
+                'validation',
+                'validation',
+                'validation',
+            ],
+            'outcome_is_complete': [True] * 9,
+            'future_alarm_codes': [
+                ('11',),
+                ('11',),
+                ('26', '98'),
+                ('26', '98'),
+                ('98',),
+                ('98',),
+                ('11',),
+                ('26',),
+                ('26',),
+            ],
+            'future_alarm_counts': [
+                tuple((code, 1) for code in codes)
+                for codes in [
+                    ('11',),
+                    ('11',),
+                    ('26', '98'),
+                    ('26', '98'),
+                    ('98',),
+                    ('98',),
+                    ('11',),
+                    ('26',),
+                    ('26',),
+                ]
+            ],
+        }
+    )
+    vocabulary = fit_forecast_label_vocabulary(labels)
+    encoded = encode_forecast_labels(vocabulary, labels)
+
+    baseline = fit_machine_frequency_baseline(
+        labels,
+        encoded,
+        minimum_machine_train_samples=2,
+    )
+    predictions = score_machine_frequency_baseline(
+        baseline,
+        incident_ids=encoded.incident_ids,
+        machine_ids=tuple(labels['machine_id']),
+    )
+
+    assert dict(baseline.machine_train_sample_counts) == {
+        '19': 1,
+        '4': 2,
+        '9': 2,
+    }
+    assert set(dict(baseline.machine_scores)) == {'4', '9'}
+    assert predictions.baseline_scopes[-4:] == (
+        'machine',
+        'machine',
+        'global_fallback',
+        'global_fallback',
+    )
+    assert predictions.machine_train_sample_counts[-4:].tolist() == [
+        2,
+        2,
+        1,
+        0,
+    ]
+    validation_scores = predictions.score_matrix.scores[-4:]
+    assert validation_scores[0].tolist() == pytest.approx([1.0, 0.0, 0.0])
+    assert validation_scores[1].tolist() == pytest.approx([0.0, 1.0, 1.0])
+    assert validation_scores[2].tolist() == pytest.approx(
+        baseline.global_scores
+    )
+    assert validation_scores[3].tolist() == pytest.approx(
+        baseline.global_scores
+    )
