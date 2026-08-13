@@ -7,7 +7,7 @@
 
 ## 目前進度
 
-第 1 至第 5 階段已完成本機驗收：Repository 與資料集準備、產品與技術設計、可重現的資料處理管線、derived alarm episode、deterministic statistical baseline，以及時間安全的相似歷史事件檢索。下一階段將建立後續警報預測模型。
+第 1 至第 6 階段已完成本機驗收：Repository 與資料集準備、產品與技術設計、可重現的資料處理管線、derived alarm episode、deterministic statistical baseline、時間安全的相似歷史事件檢索，以及後續 alarm Top-5 預測。下一階段將建立 AI Copilot 與 Streamlit 介面。
 
 目前已實作：
 
@@ -51,6 +51,13 @@ conda activate industrial-alarm-copilot
 python -m pip install --editable ".[dev]"
 ```
 
+若要重現第 6 階段的 CPU GRU 對照實驗，另安裝選配 PyTorch：
+
+```powershell
+python -m pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cpu
+python -m pip install --editable ".[sequence]"
+```
+
 執行所有單元與整合測試：
 
 ```powershell
@@ -87,6 +94,7 @@ data/processed/events.metadata.json
 ```powershell
 python -m industrial_alarm_copilot validate-retrieval
 python -m industrial_alarm_copilot test-retrieval
+python -m industrial_alarm_copilot test-forecast
 ```
 
 Retrieval CSV 與 metadata 同樣寫入 `data/processed/`，不納入 Git。正式 test 指令只能讀取設定檔中的凍結值，不接受臨時指定 feature、horizon、threshold 或 Top-K。
@@ -126,6 +134,16 @@ Recall@5 的絕對值為 0.000367，主因是 proxy relevance 會產生大量 re
 
 這些 relevance labels 來自後續匿名 alarm code 集合的 Jaccard 重疊，不是真實相似故障或根因標註。Test 結果只支持 ALPI 內的時間泛化，不代表可直接泛化到其他工廠。
 
+## 第 6 階段主要結果
+
+- 以 episode `end_time` 為 cutoff，預測同一設備未來 6 小時的 Top-5 alarm codes；
+- 比較 global、machine、transition frequency、兩種 OVR logistic 與兩種輕量 GRU；
+- validation-only 選型鎖定 `transition_frequency_v1`；
+- 最終 test coverage 98.79%、Hit@5 86.59%、Precision@5 46.59%、Mean Recall@5 69.97%；
+- validation／test Micro-F1 為 0.5528／0.5430，時間外泛化落差小；
+- rare alarm Recall@5 仍為 0，明確列為資料與標註限制；
+- 輸出 portable model JSON、test metrics、support groups、fallback profile 與 provenance。
+
 ## 預計實作範圍
 
 1. 探索警報時間軸與各設備的資料分布。
@@ -150,6 +168,7 @@ industrial-alarm-copilot/
 |-- src/industrial_alarm_copilot/
 |   |-- incidents/         # episode、mapping、baseline 與 artifact pipeline
 |   |-- retrieval/         # 特徵、時間安全檢索、評估與 artifacts
+|   |-- forecasting/       # 未來標籤、統計基線、線性／GRU、選型與 artifacts
 |   `-- data/              # loader、validation、EDA、gap、split、pipeline
 |-- tests/
 |   |-- unit/
@@ -177,6 +196,10 @@ industrial-alarm-copilot/
 - [Retrieval validation 分析](docs/RETRIEVAL_VALIDATION_ANALYSIS.md)
 - [Retrieval test 分析](docs/RETRIEVAL_TEST_ANALYSIS.md)
 - [第 5 階段驗收](docs/STAGE_5_ACCEPTANCE.md)
+- [後續 Alarm 預測契約](docs/FORECASTING_CONTRACT.md)
+- [Forecasting validation 選型分析](docs/FORECASTING_VALIDATION_ANALYSIS.md)
+- [Forecasting 最終 test 分析](docs/FORECASTING_TEST_ANALYSIS.md)
+- [第 6 階段驗收](docs/STAGE_6_ACCEPTANCE.md)
 
 ## 資料集引用
 
