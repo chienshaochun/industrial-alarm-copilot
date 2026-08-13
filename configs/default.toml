@@ -25,6 +25,9 @@ rare_max_train_support = 49
 common_min_train_support = 500
 minimum_machine_train_samples = 200
 minimum_transition_train_samples = 20
+linear_c = 1.0
+linear_max_iter = 300
+linear_class_weight_candidates = ['none', 'balanced']
 
 [split]
 strategy = "per_machine_unique_timestamp"

@@ -16,6 +16,9 @@ def _settings():
         'common_min_train_support': 500,
         'minimum_machine_train_samples': 200,
         'minimum_transition_train_samples': 20,
+        'linear_c': 1.0,
+        'linear_max_iter': 300,
+        'linear_class_weight_candidates': ['none', 'balanced'],
     }
 
 
@@ -29,6 +32,9 @@ def test_parse_forecast_settings_preserves_selected_contract():
     assert parsed.common_min_train_support == 500
     assert parsed.minimum_machine_train_samples == 200
     assert parsed.minimum_transition_train_samples == 20
+    assert parsed.linear_c == 1.0
+    assert parsed.linear_max_iter == 300
+    assert parsed.linear_class_weight_candidates == ('none', 'balanced')
 
 
 def test_parse_forecast_settings_rejects_unstudied_horizon():

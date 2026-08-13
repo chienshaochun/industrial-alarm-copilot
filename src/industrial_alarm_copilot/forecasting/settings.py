@@ -16,6 +16,9 @@ class ForecastExperimentSettings:
     common_min_train_support: int
     minimum_machine_train_samples: int
     minimum_transition_train_samples: int
+    linear_c: float
+    linear_max_iter: int
+    linear_class_weight_candidates: tuple[str, ...]
 
 
 def parse_forecast_settings(
@@ -38,6 +41,11 @@ def parse_forecast_settings(
     minimum_transition_samples = int(
         settings['minimum_transition_train_samples']
     )
+    linear_c = float(settings['linear_c'])
+    linear_max_iter = int(settings['linear_max_iter'])
+    linear_class_weight_candidates = tuple(
+        str(value) for value in settings['linear_class_weight_candidates']
+    )
 
     if top_k <= 0:
         raise ValueError('forecast top_k must be greater than zero')
@@ -59,6 +67,17 @@ def parse_forecast_settings(
         raise ValueError('minimum machine train samples must be positive')
     if minimum_transition_samples < 1:
         raise ValueError('minimum transition train samples must be positive')
+    if not math.isfinite(linear_c) or linear_c <= 0:
+        raise ValueError('linear C must be finite and positive')
+    if linear_max_iter < 1:
+        raise ValueError('linear max_iter must be positive')
+    if (
+        not linear_class_weight_candidates
+        or len(set(linear_class_weight_candidates))
+        != len(linear_class_weight_candidates)
+        or not set(linear_class_weight_candidates).issubset({'none', 'balanced'})
+    ):
+        raise ValueError('linear class weight candidates are invalid')
 
     return ForecastExperimentSettings(
         top_k=top_k,
@@ -68,4 +87,7 @@ def parse_forecast_settings(
         common_min_train_support=common_min_support,
         minimum_machine_train_samples=minimum_machine_samples,
         minimum_transition_train_samples=minimum_transition_samples,
+        linear_c=linear_c,
+        linear_max_iter=linear_max_iter,
+        linear_class_weight_candidates=linear_class_weight_candidates,
     )
