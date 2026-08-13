@@ -19,6 +19,16 @@ def _settings():
         'linear_c': 1.0,
         'linear_max_iter': 300,
         'linear_class_weight_candidates': ['none', 'balanced'],
+        'sequence_max_length': 64,
+        'sequence_embedding_dim': 24,
+        'sequence_hidden_dim': 48,
+        'sequence_machine_embedding_dim': 8,
+        'sequence_batch_size': 256,
+        'sequence_epochs': 8,
+        'sequence_learning_rate': 0.001,
+        'sequence_weight_candidates': ['none', 'balanced_capped'],
+        'sequence_positive_weight_cap': 20.0,
+        'random_seed': 0,
     }
 
 
@@ -35,6 +45,10 @@ def test_parse_forecast_settings_preserves_selected_contract():
     assert parsed.linear_c == 1.0
     assert parsed.linear_max_iter == 300
     assert parsed.linear_class_weight_candidates == ('none', 'balanced')
+    assert parsed.sequence_max_length == 64
+    assert parsed.sequence_hidden_dim == 48
+    assert parsed.sequence_weight_candidates == ('none', 'balanced_capped')
+    assert parsed.random_seed == 0
 
 
 def test_parse_forecast_settings_rejects_unstudied_horizon():

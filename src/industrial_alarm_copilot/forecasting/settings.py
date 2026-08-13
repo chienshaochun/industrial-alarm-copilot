@@ -19,6 +19,16 @@ class ForecastExperimentSettings:
     linear_c: float
     linear_max_iter: int
     linear_class_weight_candidates: tuple[str, ...]
+    sequence_max_length: int
+    sequence_embedding_dim: int
+    sequence_hidden_dim: int
+    sequence_machine_embedding_dim: int
+    sequence_batch_size: int
+    sequence_epochs: int
+    sequence_learning_rate: float
+    sequence_weight_candidates: tuple[str, ...]
+    sequence_positive_weight_cap: float
+    random_seed: int
 
 
 def parse_forecast_settings(
@@ -46,6 +56,18 @@ def parse_forecast_settings(
     linear_class_weight_candidates = tuple(
         str(value) for value in settings['linear_class_weight_candidates']
     )
+    sequence_max_length = int(settings['sequence_max_length'])
+    sequence_embedding_dim = int(settings['sequence_embedding_dim'])
+    sequence_hidden_dim = int(settings['sequence_hidden_dim'])
+    sequence_machine_embedding_dim = int(settings['sequence_machine_embedding_dim'])
+    sequence_batch_size = int(settings['sequence_batch_size'])
+    sequence_epochs = int(settings['sequence_epochs'])
+    sequence_learning_rate = float(settings['sequence_learning_rate'])
+    sequence_weight_candidates = tuple(
+        str(value) for value in settings['sequence_weight_candidates']
+    )
+    sequence_positive_weight_cap = float(settings['sequence_positive_weight_cap'])
+    random_seed = int(settings['random_seed'])
 
     if top_k <= 0:
         raise ValueError('forecast top_k must be greater than zero')
@@ -78,6 +100,29 @@ def parse_forecast_settings(
         or not set(linear_class_weight_candidates).issubset({'none', 'balanced'})
     ):
         raise ValueError('linear class weight candidates are invalid')
+    positive_ints = (
+        sequence_max_length,
+        sequence_embedding_dim,
+        sequence_hidden_dim,
+        sequence_machine_embedding_dim,
+        sequence_batch_size,
+        sequence_epochs,
+    )
+    if min(positive_ints) < 1:
+        raise ValueError('sequence dimensions and training settings must be positive')
+    if not math.isfinite(sequence_learning_rate) or sequence_learning_rate <= 0:
+        raise ValueError('sequence learning rate must be finite and positive')
+    if (
+        not sequence_weight_candidates
+        or len(set(sequence_weight_candidates)) != len(sequence_weight_candidates)
+        or not set(sequence_weight_candidates).issubset({'none', 'balanced_capped'})
+    ):
+        raise ValueError('sequence weight candidates are invalid')
+    if (
+        not math.isfinite(sequence_positive_weight_cap)
+        or sequence_positive_weight_cap < 1
+    ):
+        raise ValueError('sequence positive weight cap must be at least one')
 
     return ForecastExperimentSettings(
         top_k=top_k,
@@ -90,4 +135,14 @@ def parse_forecast_settings(
         linear_c=linear_c,
         linear_max_iter=linear_max_iter,
         linear_class_weight_candidates=linear_class_weight_candidates,
+        sequence_max_length=sequence_max_length,
+        sequence_embedding_dim=sequence_embedding_dim,
+        sequence_hidden_dim=sequence_hidden_dim,
+        sequence_machine_embedding_dim=sequence_machine_embedding_dim,
+        sequence_batch_size=sequence_batch_size,
+        sequence_epochs=sequence_epochs,
+        sequence_learning_rate=sequence_learning_rate,
+        sequence_weight_candidates=sequence_weight_candidates,
+        sequence_positive_weight_cap=sequence_positive_weight_cap,
+        random_seed=random_seed,
     )

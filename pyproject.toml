@@ -20,6 +20,9 @@ dependencies = [
 dev = [
     "pytest>=8,<10",
 ]
+sequence = [
+    "torch>=2.11,<2.12",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
