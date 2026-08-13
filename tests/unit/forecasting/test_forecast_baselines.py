@@ -6,9 +6,11 @@ import pytest
 from industrial_alarm_copilot.forecasting.baselines import (
     fit_global_frequency_baseline,
     fit_machine_frequency_baseline,
+    fit_transition_frequency_baseline,
     rank_global_frequency_baseline,
     score_global_frequency_baseline,
     score_machine_frequency_baseline,
+    score_transition_frequency_baseline,
 )
 from industrial_alarm_copilot.forecasting.evaluation import (
     evaluate_forecast_scores,
@@ -209,4 +211,82 @@ def test_machine_frequency_baseline_conditions_and_falls_back():
     )
     assert validation_scores[3].tolist() == pytest.approx(
         baseline.global_scores
+    )
+
+
+def test_transition_frequency_baseline_uses_hierarchical_fallback():
+    labels = pd.DataFrame(
+        {
+            'incident_id': [
+                'm4_a1',
+                'm4_a2',
+                'm4_b1',
+                'm9_a1',
+                'm9_a2',
+                'm19_x1',
+                'query_transition',
+                'query_machine',
+                'query_global',
+            ],
+            'machine_id': ['4', '4', '4', '9', '9', '19', '4', '4', '19'],
+            'split': ['train'] * 6 + ['validation'] * 3,
+            'outcome_is_complete': [True] * 9,
+            'future_alarm_codes': [
+                ('11',),
+                ('11',),
+                ('98',),
+                ('26',),
+                ('26',),
+                ('98',),
+                ('98',),
+                ('26',),
+                ('11',),
+            ],
+            'future_alarm_counts': [
+                ((code, 1),)
+                for code in ['11', '11', '98', '26', '26', '98', '98', '26', '11']
+            ],
+        }
+    )
+    context = pd.DataFrame(
+        {
+            'incident_id': labels['incident_id'],
+            'last_alarm_code': ['A', 'A', 'B', 'A', 'A', 'X', 'A', 'B', 'X'],
+        }
+    )
+    vocabulary = fit_forecast_label_vocabulary(labels)
+    encoded = encode_forecast_labels(vocabulary, labels)
+
+    baseline = fit_transition_frequency_baseline(
+        labels,
+        encoded,
+        context,
+        minimum_machine_train_samples=2,
+        minimum_transition_train_samples=2,
+    )
+    predictions = score_transition_frequency_baseline(
+        baseline,
+        incident_ids=encoded.incident_ids,
+        machine_ids=tuple(labels['machine_id']),
+        last_alarm_codes=tuple(context['last_alarm_code']),
+    )
+
+    assert predictions.baseline_scopes[-3:] == (
+        'transition',
+        'machine_fallback',
+        'global_fallback',
+    )
+    assert predictions.transition_train_sample_counts[-3:].tolist() == [
+        2,
+        1,
+        1,
+    ]
+    validation_scores = predictions.score_matrix.scores[-3:]
+    assert validation_scores[0].tolist() == pytest.approx([1.0, 0.0, 0.0])
+    machine4_scores = dict(
+        baseline.machine_baseline.machine_scores
+    )['4']
+    assert validation_scores[1].tolist() == pytest.approx(machine4_scores)
+    assert validation_scores[2].tolist() == pytest.approx(
+        baseline.machine_baseline.global_scores
     )

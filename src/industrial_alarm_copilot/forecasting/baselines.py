@@ -50,6 +50,29 @@ class MachineFrequencyScores:
     machine_train_sample_counts: np.ndarray
 
 
+TRANSITION_FREQUENCY_MODEL_VERSION = 'transition_frequency_v1'
+
+
+@dataclass(frozen=True)
+class TransitionFrequencyBaseline:
+    '''Machine-state transition frequencies with hierarchical fallback.'''
+
+    machine_baseline: MachineFrequencyBaseline
+    transition_scores: tuple[tuple[tuple[str, str], np.ndarray], ...]
+    transition_train_sample_counts: tuple[tuple[tuple[str, str], int], ...]
+    minimum_transition_train_samples: int
+    model_version: str = TRANSITION_FREQUENCY_MODEL_VERSION
+
+
+@dataclass(frozen=True)
+class TransitionFrequencyScores:
+    '''Transition scores, scopes, and train support per query.'''
+
+    score_matrix: ForecastScoreMatrix
+    baseline_scopes: tuple[str, ...]
+    transition_train_sample_counts: np.ndarray
+
+
 def _validate_label_alignment(
     labels: pd.DataFrame,
     encoded: EncodedForecastLabels,
@@ -222,4 +245,126 @@ def score_machine_frequency_baseline(
         ),
         baseline_scopes=tuple(scopes),
         machine_train_sample_counts=sample_counts,
+    )
+
+
+def fit_transition_frequency_baseline(
+    labels: pd.DataFrame,
+    encoded: EncodedForecastLabels,
+    incident_context: pd.DataFrame,
+    minimum_machine_train_samples: int,
+    minimum_transition_train_samples: int,
+) -> TransitionFrequencyBaseline:
+    '''Fit P(future alarm | machine, last alarm) on complete train.'''
+    if minimum_transition_train_samples < 1:
+        raise ValueError('minimum_transition_train_samples must be positive')
+    aligned_labels = _validate_label_alignment(labels, encoded)
+    required_context_columns = {'incident_id', 'last_alarm_code'}
+    if not required_context_columns.issubset(incident_context.columns):
+        raise ValueError('incident context is missing required columns')
+    if not incident_context['incident_id'].is_unique:
+        raise ValueError('incident context incident_id must be unique')
+
+    context = incident_context.copy()
+    context['incident_id'] = context['incident_id'].astype(str)
+    context['last_alarm_code'] = context['last_alarm_code'].astype(str)
+    context = context.set_index('incident_id')
+    missing_ids = set(encoded.incident_ids).difference(context.index)
+    if missing_ids:
+        raise ValueError('every forecast label must have incident context')
+    last_alarm_codes = context.loc[
+        list(encoded.incident_ids),
+        'last_alarm_code',
+    ].to_numpy(dtype=str)
+
+    machine_baseline = fit_machine_frequency_baseline(
+        labels,
+        encoded,
+        minimum_machine_train_samples=minimum_machine_train_samples,
+    )
+    train_mask = (
+        aligned_labels['split'].eq('train')
+        & aligned_labels['outcome_is_complete'].astype(bool)
+    ).to_numpy()
+    machine_ids = aligned_labels['machine_id'].astype(str).to_numpy()
+    state_keys = [
+        (str(machine_id), str(last_alarm_code))
+        for machine_id, last_alarm_code in zip(
+            machine_ids,
+            last_alarm_codes,
+            strict=True,
+        )
+    ]
+    transition_scores = []
+    transition_sample_counts = []
+    for state_key in sorted(set(state_keys)):
+        machine_id, last_alarm_code = state_key
+        state_mask = (
+            train_mask
+            & (machine_ids == machine_id)
+            & (last_alarm_codes == last_alarm_code)
+        )
+        sample_count = int(state_mask.sum())
+        transition_sample_counts.append((state_key, sample_count))
+        if sample_count < minimum_transition_train_samples:
+            continue
+        positive_counts = np.asarray(
+            encoded.matrix[state_mask].sum(axis=0)
+        ).ravel()
+        transition_scores.append(
+            (state_key, positive_counts.astype(float) / sample_count)
+        )
+
+    return TransitionFrequencyBaseline(
+        machine_baseline=machine_baseline,
+        transition_scores=tuple(transition_scores),
+        transition_train_sample_counts=tuple(transition_sample_counts),
+        minimum_transition_train_samples=minimum_transition_train_samples,
+    )
+
+
+def score_transition_frequency_baseline(
+    baseline: TransitionFrequencyBaseline,
+    incident_ids: tuple[str, ...],
+    machine_ids: tuple[str, ...],
+    last_alarm_codes: tuple[str, ...],
+) -> TransitionFrequencyScores:
+    '''Score transition state with machine then global fallback.'''
+    if not (
+        len(incident_ids) == len(machine_ids) == len(last_alarm_codes)
+    ):
+        raise ValueError('transition query fields must align')
+    machine_predictions = score_machine_frequency_baseline(
+        baseline.machine_baseline,
+        incident_ids=incident_ids,
+        machine_ids=machine_ids,
+    )
+    scores = machine_predictions.score_matrix.scores.copy()
+    score_by_state = dict(baseline.transition_scores)
+    support_by_state = dict(baseline.transition_train_sample_counts)
+    scopes = []
+    state_sample_counts = np.zeros(len(incident_ids), dtype=np.int64)
+    for row_number, (raw_machine_id, raw_last_alarm_code) in enumerate(
+        zip(machine_ids, last_alarm_codes, strict=True)
+    ):
+        state_key = (str(raw_machine_id), str(raw_last_alarm_code))
+        state_sample_counts[row_number] = support_by_state.get(state_key, 0)
+        transition_score = score_by_state.get(state_key)
+        if transition_score is not None:
+            scores[row_number] = transition_score
+            scopes.append('transition')
+        elif machine_predictions.baseline_scopes[row_number] == 'machine':
+            scopes.append('machine_fallback')
+        else:
+            scopes.append('global_fallback')
+
+    return TransitionFrequencyScores(
+        score_matrix=ForecastScoreMatrix(
+            incident_ids=incident_ids,
+            alarm_codes=baseline.machine_baseline.alarm_codes,
+            scores=scores,
+            model_version=baseline.model_version,
+        ),
+        baseline_scopes=tuple(scopes),
+        transition_train_sample_counts=state_sample_counts,
     )

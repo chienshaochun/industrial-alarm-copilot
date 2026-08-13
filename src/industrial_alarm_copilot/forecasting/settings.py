@@ -15,6 +15,7 @@ class ForecastExperimentSettings:
     rare_max_train_support: int
     common_min_train_support: int
     minimum_machine_train_samples: int
+    minimum_transition_train_samples: int
 
 
 def parse_forecast_settings(
@@ -33,6 +34,9 @@ def parse_forecast_settings(
     common_min_support = int(settings['common_min_train_support'])
     minimum_machine_samples = int(
         settings['minimum_machine_train_samples']
+    )
+    minimum_transition_samples = int(
+        settings['minimum_transition_train_samples']
     )
 
     if top_k <= 0:
@@ -53,6 +57,8 @@ def parse_forecast_settings(
         )
     if minimum_machine_samples < 1:
         raise ValueError('minimum machine train samples must be positive')
+    if minimum_transition_samples < 1:
+        raise ValueError('minimum transition train samples must be positive')
 
     return ForecastExperimentSettings(
         top_k=top_k,
@@ -61,4 +67,5 @@ def parse_forecast_settings(
         rare_max_train_support=rare_max_support,
         common_min_train_support=common_min_support,
         minimum_machine_train_samples=minimum_machine_samples,
+        minimum_transition_train_samples=minimum_transition_samples,
     )

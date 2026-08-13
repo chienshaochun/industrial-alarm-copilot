@@ -24,6 +24,7 @@ selected_forecast_horizon_hours = 6
 rare_max_train_support = 49
 common_min_train_support = 500
 minimum_machine_train_samples = 200
+minimum_transition_train_samples = 20
 
 [split]
 strategy = "per_machine_unique_timestamp"
