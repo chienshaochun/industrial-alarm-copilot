@@ -10,7 +10,10 @@ from industrial_alarm_copilot.application.investigation import (
     load_investigation_resources,
 )
 from industrial_alarm_copilot.data.runtime import load_pipeline_settings
-from industrial_alarm_copilot.presentation.data import build_overview_data
+from industrial_alarm_copilot.presentation.data import (
+    build_evaluation_data,
+    build_overview_data,
+)
 
 
 @st.cache_data(show_spinner=False)
@@ -38,3 +41,17 @@ def load_investigation_service(project_root: str) -> InvestigationService:
         settings,
     )
     return InvestigationService(resources)
+
+
+@st.cache_data(show_spinner=False)
+def load_evaluation_data(
+    retrieval_results_path: str,
+    forecast_results_path: str,
+    support_groups_path: str,
+):
+    '''Read the locked test reports without recomputing evaluation.'''
+    return build_evaluation_data(
+        pd.read_csv(retrieval_results_path),
+        pd.read_csv(forecast_results_path),
+        pd.read_csv(support_groups_path),
+    )

@@ -22,6 +22,15 @@ class OverviewData:
     split_incidents: pd.DataFrame
 
 
+@dataclass(frozen=True)
+class EvaluationData:
+    '''Locked Stage 5 and Stage 6 test results for portfolio reporting.'''
+
+    retrieval: dict[str, object]
+    forecasting: dict[str, object]
+    support_groups: pd.DataFrame
+
+
 def required_artifact_paths(project_root: Path) -> dict[str, Path]:
     processed = project_root / 'data' / 'processed'
     return {
@@ -89,4 +98,28 @@ def build_overview_data(
         top_alarms=top_alarms,
         machine_events=machine_events,
         split_incidents=split_incidents,
+    )
+
+
+def build_evaluation_data(
+    retrieval_results: pd.DataFrame,
+    forecast_results: pd.DataFrame,
+    support_groups: pd.DataFrame,
+) -> EvaluationData:
+    '''Validate the single locked test rows before presentation.'''
+    if len(retrieval_results) != 1 or len(forecast_results) != 1:
+        raise ValueError('evaluation artifacts must contain one locked row')
+    retrieval = retrieval_results.iloc[0].to_dict()
+    forecasting = forecast_results.iloc[0].to_dict()
+    if retrieval['evaluation_split'] != 'test':
+        raise ValueError('retrieval evaluation must use test split')
+    if forecasting['split'] != 'test':
+        raise ValueError('forecast evaluation must use test split')
+    expected_groups = {'rare', 'medium', 'common'}
+    if set(support_groups['support_group']) != expected_groups:
+        raise ValueError('forecast support groups are incomplete')
+    return EvaluationData(
+        retrieval=retrieval,
+        forecasting=forecasting,
+        support_groups=support_groups.copy(),
     )
