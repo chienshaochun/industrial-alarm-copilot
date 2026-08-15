@@ -155,6 +155,22 @@ Recall@5 的絕對值為 0.000367，主因是 proxy relevance 會產生大量 re
 
 資料集未提供警報說明、實際根因或維修程序，因此應用不會虛構操作建議，並會明確區分觀察到的事實、模型預測與 AI 產生的摘要。
 
+## 第 7 階段成果摘要
+
+- 完成三頁 Streamlit 應用：資料總覽、事件調查工作台、模型評估。
+- 調查工作台整合 episode 事實、time-safe Top-5 歷史證據與 forecasting Top-5。
+- 預設使用離線 deterministic Copilot 摘要，不需要 API key 或本機 LLM。
+- 保留 provider-neutral LLM adapter；未知 episode／Alarm 引用會觸發安全 fallback。
+- 模型評估頁同時呈現整體指標與 retrieval recall、rare Alarm 長尾限制。
+
+啟動應用：
+
+```powershell
+python -m streamlit run app.py
+```
+
+詳細操作請參閱[Streamlit 應用操作指南](docs/STREAMLIT_APP_GUIDE.md)，資訊邊界請參閱 [Copilot 證據契約](docs/COPILOT_EVIDENCE_CONTRACT.md)。
+
 ## Repository 結構
 
 ```text
@@ -200,6 +216,9 @@ industrial-alarm-copilot/
 - [Forecasting validation 選型分析](docs/FORECASTING_VALIDATION_ANALYSIS.md)
 - [Forecasting 最終 test 分析](docs/FORECASTING_TEST_ANALYSIS.md)
 - [第 6 階段驗收](docs/STAGE_6_ACCEPTANCE.md)
+- [Copilot 證據契約](docs/COPILOT_EVIDENCE_CONTRACT.md)
+- [Streamlit 應用操作指南](docs/STREAMLIT_APP_GUIDE.md)
+- [第 7 階段驗收](docs/STAGE_7_ACCEPTANCE.md)
 
 ## 資料集引用
 

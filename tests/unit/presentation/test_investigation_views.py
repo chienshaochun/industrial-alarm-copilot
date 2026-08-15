@@ -1,6 +1,6 @@
 '''Investigation table adapter tests.'''
 
-from tests.unit.copilot.test_summary import _result
+from tests.unit.copilot.test_copilot_summary import _result
 
 from industrial_alarm_copilot.presentation.investigation_views import (
     forecast_prediction_frame,
