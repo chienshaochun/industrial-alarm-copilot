@@ -50,7 +50,16 @@ GitHub Actions 會在 Ubuntu／Python 3.12 重複執行完整 pytest 與 deploym
 8. 本版本不需要 secrets；不要填入 API key。
 9. 按下 **Deploy**，等待 build 與 health check 完成。
 
-公開 Repository 部署完成後，應用預設為公開網址。取得 URL 後，應回填 README 並重新執行 smoke test。
+## 正式部署
+
+- 公開網址：<https://industrial-alarm-copilot.streamlit.app/>
+- Repository：`chienshaochun/industrial-alarm-copilot`
+- Branch：`main`
+- Main file：`app.py`
+- Python：`3.12`
+- Secrets：無
+
+公開端點已確認可由外部取得 HTTP 200；部署前的完整 pytest、三頁 AppTest 與 headless Streamlit smoke test 均已通過。
 
 ## Snapshot 更新規則
 
