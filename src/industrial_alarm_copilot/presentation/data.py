@@ -33,12 +33,21 @@ class EvaluationData:
 
 
 ARTIFACT_DIRECTORY_ENV = 'INDUSTRIAL_ALARM_ARTIFACT_DIR'
+PROJECT_ROOT_ENV = 'INDUSTRIAL_ALARM_PROJECT_ROOT'
 CORE_ARTIFACT_FILENAMES = (
     'events.parquet',
     'incidents.parquet',
     'incident_events.parquet',
     'forecast_model.json',
 )
+
+
+def resolve_project_root() -> Path:
+    '''Resolve repository files independently of an installed wheel path.'''
+    override = os.environ.get(PROJECT_ROOT_ENV)
+    if override:
+        return Path(override).resolve()
+    return Path.cwd().resolve()
 
 
 def resolve_artifact_directory(project_root: Path) -> Path:

@@ -9,10 +9,11 @@ import streamlit as st
 from industrial_alarm_copilot.presentation.runtime import load_evaluation_data
 from industrial_alarm_copilot.presentation.data import (
     resolve_artifact_directory,
+    resolve_project_root,
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+PROJECT_ROOT = resolve_project_root()
 
 
 def _percentage(value: object) -> str:

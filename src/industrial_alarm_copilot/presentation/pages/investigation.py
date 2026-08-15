@@ -8,7 +8,10 @@ import streamlit as st
 from industrial_alarm_copilot.copilot.summary import (
     TemplateSummaryGenerator,
 )
-from industrial_alarm_copilot.presentation.data import missing_artifacts
+from industrial_alarm_copilot.presentation.data import (
+    missing_artifacts,
+    resolve_project_root,
+)
 from industrial_alarm_copilot.presentation.investigation_views import (
     forecast_prediction_frame,
     observed_event_frame,
@@ -19,7 +22,7 @@ from industrial_alarm_copilot.presentation.runtime import (
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+PROJECT_ROOT = resolve_project_root()
 
 
 def _episode_label(option) -> str:

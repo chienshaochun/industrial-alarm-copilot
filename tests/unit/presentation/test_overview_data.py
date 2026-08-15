@@ -7,8 +7,10 @@ import pandas as pd
 from industrial_alarm_copilot.presentation.data import (
     ARTIFACT_DIRECTORY_ENV,
     CORE_ARTIFACT_FILENAMES,
+    PROJECT_ROOT_ENV,
     build_overview_data,
     resolve_artifact_directory,
+    resolve_project_root,
 )
 
 
@@ -78,3 +80,12 @@ def test_resolve_artifact_directory_honors_relative_override(
     assert resolve_artifact_directory(tmp_path) == (
         tmp_path / 'fixtures' / 'cloud'
     )
+
+
+def test_resolve_project_root_honors_explicit_override(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv(PROJECT_ROOT_ENV, str(tmp_path))
+
+    assert resolve_project_root() == tmp_path.resolve()

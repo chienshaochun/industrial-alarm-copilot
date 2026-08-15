@@ -8,11 +8,12 @@ import streamlit as st
 from industrial_alarm_copilot.presentation.data import (
     missing_artifacts,
     required_artifact_paths,
+    resolve_project_root,
 )
 from industrial_alarm_copilot.presentation.runtime import load_overview_data
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+PROJECT_ROOT = resolve_project_root()
 
 
 def _missing_artifact_message(missing: tuple[str, ...]) -> None:
