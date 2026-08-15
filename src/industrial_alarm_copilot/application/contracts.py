@@ -64,6 +64,8 @@ class RetrievedEpisodeEvidence:
     similarity_score: float
     shared_alarm_codes: tuple[str, ...]
     future_alarm_codes: tuple[str, ...]
+    outcome_is_complete: bool
+    future_horizon_hours: float
 
     def __post_init__(self) -> None:
         if self.rank < 1:
@@ -76,6 +78,11 @@ class RetrievedEpisodeEvidence:
             raise ValueError(
                 'similarity_score must be within the cosine range'
             )
+        if (
+            not math.isfinite(self.future_horizon_hours)
+            or self.future_horizon_hours <= 0
+        ):
+            raise ValueError('future_horizon_hours must be finite and positive')
 
 
 @dataclass(frozen=True, slots=True)

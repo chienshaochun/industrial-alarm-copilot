@@ -48,6 +48,8 @@ def test_investigation_result_keeps_evidence_types_separate_and_immutable():
         similarity_score=0.73,
         shared_alarm_codes=('11', '98'),
         future_alarm_codes=('26',),
+        outcome_is_complete=True,
+        future_horizon_hours=6.0,
     )
     prediction = ForecastPrediction(
         rank=1,
@@ -97,6 +99,8 @@ def test_retrieved_evidence_rejects_invalid_ranking_values(
         'similarity_score': 0.73,
         'shared_alarm_codes': ('11', '98'),
         'future_alarm_codes': ('26',),
+        'outcome_is_complete': True,
+        'future_horizon_hours': 6.0,
     }
     values[field_name] = field_value
 
