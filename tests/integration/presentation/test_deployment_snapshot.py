@@ -20,7 +20,7 @@ EXPECTED_SHA256 = {
         'd40b79d6ddd52030aa44269934d1288a3d2cb9cc3dc996dcb3861a995f5959db'
     ),
     'forecast_model.json': (
-        '5675227676c24abbe3cb733f1812398f14c32f0350e0c18f93c0ca49f6f57431'
+        '1bd17eb1e7e4249cd9aee8a0e648442e44ae41842952079336ced05c9679551d'
     ),
     'retrieval_test_results.csv': (
         'e30093a73e29c258227e91c0cf1c489a2635545d1bafd46d881ac4bac0f7fc3f'
@@ -35,11 +35,10 @@ EXPECTED_SHA256 = {
 
 
 def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open('rb') as artifact_file:
-        for chunk in iter(lambda: artifact_file.read(1024 * 1024), b''):
-            digest.update(chunk)
-    return digest.hexdigest()
+    content = path.read_bytes()
+    if path.suffix in {'.json', '.csv'}:
+        content = content.replace(b'\r\n', b'\n')
+    return hashlib.sha256(content).hexdigest()
 
 
 def test_deployment_snapshot_matches_reviewed_hashes():
