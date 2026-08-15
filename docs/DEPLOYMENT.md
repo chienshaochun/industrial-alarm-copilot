@@ -34,7 +34,7 @@ python scripts/validate_deployment.py
 
 加入 deployment snapshot、root resolver 與 CI 後的完整本機驗收結果為 **153 passed in 158.07s**，隨後的 deployment smoke 亦為三頁通過。
 
-GitHub Actions 會在 Ubuntu／Python 3.12 重複執行完整 pytest 與 deployment smoke，避免只在 Windows 本機成立。
+GitHub Actions 會在 Ubuntu／Python 3.12 重複執行完整 pytest 與 deployment smoke，避免只在 Windows 本機成立。CI 額外安裝 CPU PyTorch 2.11 以覆蓋 Stage 6 GRU 測試；Community Cloud runtime 不需要 PyTorch，因此 `requirements.txt` 不包含這個大型 optional dependency。
 
 ## Community Cloud 設定
 
