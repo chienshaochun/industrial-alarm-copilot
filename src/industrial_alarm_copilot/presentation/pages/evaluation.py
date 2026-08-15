@@ -6,6 +6,9 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
+from industrial_alarm_copilot.presentation.charts import (
+    render_interactive_chart,
+)
 from industrial_alarm_copilot.presentation.runtime import load_evaluation_data
 from industrial_alarm_copilot.presentation.data import (
     resolve_artifact_directory,
@@ -61,8 +64,10 @@ def _render_retrieval_metrics(metrics: dict[str, object]) -> None:
         range_y=[0, 1],
         color_discrete_sequence=['#2878b5'],
     )
-    chart.update_layout(margin=dict(l=0, r=0, t=10, b=0))
-    st.plotly_chart(chart, width='stretch')
+    chart.update_traces(
+        hovertemplate='<b>%{x}</b><br>分數：%{y:.1%}<extra></extra>'
+    )
+    render_interactive_chart(chart, key='evaluation-retrieval')
     st.markdown(
         '<div class="copilot-note">Recall@5 很低不是隱藏掉的失敗：每個 query '
         '可有大量「未來結果相似」的歷史候選，而 UI 只展示 5 筆。Top-5 的目的'
@@ -105,9 +110,13 @@ def _render_forecast_metrics(
     )
     chart.update_layout(
         yaxis_tickformat='.0%',
-        margin=dict(l=0, r=0, t=10, b=0),
     )
-    st.plotly_chart(chart, width='stretch')
+    chart.update_traces(
+        hovertemplate=(
+            '<b>%{x}</b><br>%{fullData.name}：%{y:.1%}<extra></extra>'
+        )
+    )
+    render_interactive_chart(chart, key='evaluation-forecast-support')
     st.dataframe(
         support_groups,
         width='stretch',
