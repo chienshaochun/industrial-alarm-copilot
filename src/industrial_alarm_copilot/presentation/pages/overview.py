@@ -41,14 +41,23 @@ def render_overview_page() -> None:
         str(paths['incidents']),
     )
 
-    columns = st.columns(5)
+    columns = st.columns(4)
     columns[0].metric('Alarm events', f'{overview.event_count:,}')
     columns[1].metric('Derived episodes', f'{overview.incident_count:,}')
     columns[2].metric('設備', f'{overview.machine_count}')
     columns[3].metric('Alarm codes', f'{overview.alarm_code_count}')
-    columns[4].metric(
-        '資料期間',
-        f'{overview.start_time:%Y-%m} → {overview.end_time:%Y-%m}',
+
+    st.markdown('### 資料涵蓋期間')
+    period_start, period_end = st.columns(2)
+    period_start.metric('資料起點', f'{overview.start_time:%Y-%m-%d}')
+    period_start.caption(f'時間：{overview.start_time:%H:%M:%S.%f}'[:-3])
+    period_end.metric('資料終點', f'{overview.end_time:%Y-%m-%d}')
+    period_end.caption(f'時間：{overview.end_time:%H:%M:%S.%f}'[:-3])
+    st.caption(
+        '完整時間範圍：'
+        f'{overview.start_time:%Y-%m-%d %H:%M:%S.%f}'[:-3]
+        + ' → '
+        + f'{overview.end_time:%Y-%m-%d %H:%M:%S.%f}'[:-3]
     )
 
     st.markdown('### Alarm 活動量')
