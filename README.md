@@ -171,6 +171,10 @@ python -m streamlit run app.py
 
 詳細操作請參閱[Streamlit 應用操作指南](docs/STREAMLIT_APP_GUIDE.md)，資訊邊界請參閱 [Copilot 證據契約](docs/COPILOT_EVIDENCE_CONTRACT.md)。
 
+### 雲端部署狀態
+
+Repository 已包含固定版本的 deployment snapshot、Streamlit Cloud 設定、固定 dependencies、三頁 smoke test 與 Ubuntu CI。公開網址建立流程請參閱[部署指南](docs/DEPLOYMENT.md)。
+
 ## Repository 結構
 
 ```text
@@ -219,6 +223,7 @@ industrial-alarm-copilot/
 - [Copilot 證據契約](docs/COPILOT_EVIDENCE_CONTRACT.md)
 - [Streamlit 應用操作指南](docs/STREAMLIT_APP_GUIDE.md)
 - [第 7 階段驗收](docs/STAGE_7_ACCEPTANCE.md)
+- [Streamlit Community Cloud 部署指南](docs/DEPLOYMENT.md)
 
 ## 資料集引用
 

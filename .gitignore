@@ -4,8 +4,10 @@ __pycache__/
 .pytest_cache/
 .codex-pytest-tmp/
 .cloud-smoke/
+.stage8-test-tmp/
 .venv/
 *.egg-info/
+build/
 
 # Local configuration
 .env
