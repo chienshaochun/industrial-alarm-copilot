@@ -1,6 +1,15 @@
 '''Streamlit entry point for the Industrial Alarm Copilot.'''
 
+import os
+from pathlib import Path
+
 import streamlit as st
+
+
+os.environ.setdefault(
+    'INDUSTRIAL_ALARM_PROJECT_ROOT',
+    str(Path(__file__).resolve().parent),
+)
 
 from industrial_alarm_copilot.presentation.pages.evaluation import (
     render_evaluation_page,

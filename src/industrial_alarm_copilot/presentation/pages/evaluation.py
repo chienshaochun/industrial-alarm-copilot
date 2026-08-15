@@ -7,9 +7,13 @@ import plotly.express as px
 import streamlit as st
 
 from industrial_alarm_copilot.presentation.runtime import load_evaluation_data
+from industrial_alarm_copilot.presentation.data import (
+    resolve_artifact_directory,
+    resolve_project_root,
+)
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+PROJECT_ROOT = resolve_project_root()
 
 
 def _percentage(value: object) -> str:
@@ -17,11 +21,11 @@ def _percentage(value: object) -> str:
 
 
 def _evaluation_paths() -> dict[str, Path]:
-    processed = PROJECT_ROOT / 'data' / 'processed'
+    artifact_directory = resolve_artifact_directory(PROJECT_ROOT)
     return {
-        'retrieval': processed / 'retrieval_test_results.csv',
-        'forecast': processed / 'forecast_test_results.csv',
-        'support': processed / 'forecast_test_support_groups.csv',
+        'retrieval': artifact_directory / 'retrieval_test_results.csv',
+        'forecast': artifact_directory / 'forecast_test_results.csv',
+        'support': artifact_directory / 'forecast_test_support_groups.csv',
     }
 
 

@@ -1,0 +1,3 @@
+data/deployment/*.parquet -text
+data/deployment/*.json text eol=lf
+data/deployment/*.csv text eol=lf
