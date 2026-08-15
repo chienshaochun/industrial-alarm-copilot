@@ -5,9 +5,11 @@
 
 本專案與 workspace 內既有的 Codex Skills 分開維護。最終產品會在一個小型互動式應用中，整合可重現的警報分析、相似事件檢索、後續警報預測、具歷史證據的 AI 摘要，以及可量化的評估流程。
 
+**[開啟線上 Live Demo](https://industrial-alarm-copilot.streamlit.app/)**
+
 ## 目前進度
 
-第 1 至第 6 階段已完成本機驗收：Repository 與資料集準備、產品與技術設計、可重現的資料處理管線、derived alarm episode、deterministic statistical baseline、時間安全的相似歷史事件檢索，以及後續 alarm Top-5 預測。下一階段將建立 AI Copilot 與 Streamlit 介面。
+第 1 至第 8 階段皆已完成：Repository 與資料集準備、產品與技術設計、可重現的資料處理管線、derived alarm episode、deterministic statistical baseline、時間安全的相似歷史事件檢索、後續 alarm Top-5 預測、證據約束 Copilot、Streamlit 介面，以及公開雲端部署。
 
 目前已實作：
 
@@ -24,7 +26,7 @@
 - 候選 episode 與其 6 小時 outcome 都必須在 query 開始前完整可得；
 - 以 validation 的 18 組實驗凍結 feature、horizon 與 relevance threshold；
 - 以未參與選型的 test episodes 完成一次最終檢索驗收；
-- 以 85 項測試驗收目前的完整資料、incident 與 retrieval 流程。
+- 以 153 項測試驗收完整資料、incident、retrieval、forecasting、Copilot、Streamlit 與 deployment 流程。
 
 ## 資料集摘要
 
@@ -173,7 +175,7 @@ python -m streamlit run app.py
 
 ### 雲端部署狀態
 
-Repository 已包含固定版本的 deployment snapshot、Streamlit Cloud 設定、固定 dependencies、三頁 smoke test 與 Ubuntu CI。公開網址建立流程請參閱[部署指南](docs/DEPLOYMENT.md)。
+應用已部署至 Streamlit Community Cloud：[開啟公開版 Industrial Alarm Copilot](https://industrial-alarm-copilot.streamlit.app/)。Repository 同時包含固定版本的 deployment snapshot、Streamlit Cloud 設定、固定 dependencies、三頁 smoke test 與 Ubuntu CI；部署方式請參閱[部署指南](docs/DEPLOYMENT.md)。
 
 ## Repository 結構
 
