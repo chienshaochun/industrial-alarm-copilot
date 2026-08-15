@@ -1,0 +1,2 @@
+split,model_version,top_k,episode_count,complete_outcome_count,outcome_coverage,complete_empty_known_label_count,unknown_label_query_count,mean_hit_at_k,mean_precision_at_k,mean_recall_at_k,micro_precision_at_k,micro_recall_at_k,micro_f1_at_k,macro_f1_at_k,evaluated_label_count
+test,transition_frequency_v1,5,6364,6287,0.9879006913890634,775,51,0.8659137903610625,0.46591379036106256,0.6997448829996,0.4659137903610625,0.6507308837250633,0.5430276964146675,0.07582142698542489,97

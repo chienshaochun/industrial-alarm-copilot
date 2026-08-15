@@ -1,0 +1,4 @@
+support_group,label_count,evaluated_label_count,evaluation_positive_count,predicted_positive_count,true_positive_count,micro_precision_at_k,micro_recall_at_k,micro_f1_at_k,macro_f1_at_k
+rare,73,33,315,0,0,0.0,0.0,0.0,0.0
+medium,44,42,1648,128,32,0.25,0.019417475728155338,0.036036036036036036,0.013992834122442031
+common,22,22,20544,31307,14614,0.4667965630689622,0.711351246105919,0.563692117799078,0.30758997202016586

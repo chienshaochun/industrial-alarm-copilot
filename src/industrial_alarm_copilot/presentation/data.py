@@ -1,6 +1,7 @@
 '''Small, deterministic view models for the Streamlit pages.'''
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -31,13 +32,38 @@ class EvaluationData:
     support_groups: pd.DataFrame
 
 
-def required_artifact_paths(project_root: Path) -> dict[str, Path]:
+ARTIFACT_DIRECTORY_ENV = 'INDUSTRIAL_ALARM_ARTIFACT_DIR'
+CORE_ARTIFACT_FILENAMES = (
+    'events.parquet',
+    'incidents.parquet',
+    'incident_events.parquet',
+    'forecast_model.json',
+)
+
+
+def resolve_artifact_directory(project_root: Path) -> Path:
+    '''Prefer local processed artifacts, then the deployment snapshot.'''
+    override = os.environ.get(ARTIFACT_DIRECTORY_ENV)
+    if override:
+        override_path = Path(override)
+        return (
+            override_path
+            if override_path.is_absolute()
+            else project_root / override_path
+        )
     processed = project_root / 'data' / 'processed'
+    if all((processed / filename).is_file() for filename in CORE_ARTIFACT_FILENAMES):
+        return processed
+    return project_root / 'data' / 'deployment'
+
+
+def required_artifact_paths(project_root: Path) -> dict[str, Path]:
+    artifact_directory = resolve_artifact_directory(project_root)
     return {
-        'events': processed / 'events.parquet',
-        'incidents': processed / 'incidents.parquet',
-        'incident_events': processed / 'incident_events.parquet',
-        'forecast_model': processed / 'forecast_model.json',
+        'events': artifact_directory / 'events.parquet',
+        'incidents': artifact_directory / 'incidents.parquet',
+        'incident_events': artifact_directory / 'incident_events.parquet',
+        'forecast_model': artifact_directory / 'forecast_model.json',
     }
 
 

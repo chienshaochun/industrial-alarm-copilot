@@ -13,6 +13,7 @@ from industrial_alarm_copilot.data.runtime import load_pipeline_settings
 from industrial_alarm_copilot.presentation.data import (
     build_evaluation_data,
     build_overview_data,
+    resolve_artifact_directory,
 )
 
 
@@ -31,13 +32,13 @@ def load_overview_data(events_path: str, incidents_path: str):
 def load_investigation_service(project_root: str) -> InvestigationService:
     '''Build expensive retrieval features once per Streamlit process.'''
     root = Path(project_root)
-    processed = root / 'data' / 'processed'
+    artifact_directory = resolve_artifact_directory(root)
     settings = load_pipeline_settings(root / 'configs' / 'default.toml')
     resources = load_investigation_resources(
-        processed / 'events.parquet',
-        processed / 'incidents.parquet',
-        processed / 'incident_events.parquet',
-        processed / 'forecast_model.json',
+        artifact_directory / 'events.parquet',
+        artifact_directory / 'incidents.parquet',
+        artifact_directory / 'incident_events.parquet',
+        artifact_directory / 'forecast_model.json',
         settings,
     )
     return InvestigationService(resources)
