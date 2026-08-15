@@ -11,6 +11,11 @@ def test_streamlit_default_page_renders_without_exception():
 
     assert not app.exception
     assert app.title[0].value == 'Industrial Alarm Copilot'
+    metrics = {metric.label: metric.value for metric in app.metric}
+    assert metrics['資料起點'] == '2019-02-21'
+    assert metrics['資料終點'] == '2020-06-17'
+    captions = [caption.value for caption in app.caption]
+    assert any('完整時間範圍：' in caption for caption in captions)
 
 
 def test_streamlit_investigation_page_renders_without_exception():

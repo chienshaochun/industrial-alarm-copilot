@@ -8,6 +8,9 @@ import streamlit as st
 from industrial_alarm_copilot.copilot.summary import (
     TemplateSummaryGenerator,
 )
+from industrial_alarm_copilot.presentation.charts import (
+    render_interactive_chart,
+)
 from industrial_alarm_copilot.presentation.data import (
     missing_artifacts,
     resolve_project_root,
@@ -40,15 +43,22 @@ def _render_observed(result) -> None:
         x='timestamp',
         y='alarm_code',
         color='alarm_code',
-        hover_data=['event_position', 'gap_seconds'],
+        custom_data=['event_position', 'gap_seconds'],
         labels={'timestamp': '時間', 'alarm_code': 'Alarm code'},
     )
-    figure.update_traces(marker={'size': 11})
+    figure.update_traces(
+        marker={'size': 11},
+        hovertemplate=(
+            '<b>Alarm code %{y}</b><br>'
+            '時間：%{x|%Y-%m-%d %H:%M:%S.%L}<br>'
+            '事件順序：%{customdata[0]}<br>'
+            '距前一筆：%{customdata[1]:.3f} 秒<extra></extra>'
+        ),
+    )
     figure.update_layout(
         showlegend=False,
-        margin=dict(l=0, r=0, t=10, b=0),
     )
-    st.plotly_chart(figure, width='stretch')
+    render_interactive_chart(figure, key='investigation-observed-events')
     st.dataframe(
         events,
         width='stretch',
@@ -98,14 +108,21 @@ def _render_predictions(result) -> None:
         y='alarm_code',
         orientation='h',
         color='baseline_scope',
+        custom_data=['train_support'],
         labels={
             'model_score': '模型分數',
             'alarm_code': 'Alarm code',
             'baseline_scope': '基線層級',
         },
     )
-    figure.update_layout(margin=dict(l=0, r=0, t=10, b=0))
-    st.plotly_chart(figure, width='stretch')
+    figure.update_traces(
+        hovertemplate=(
+            '<b>Alarm code %{y}</b><br>'
+            '模型分數：%{x:.3f}<br>'
+            'Train support：%{customdata[0]:,}<extra></extra>'
+        )
+    )
+    render_interactive_chart(figure, key='investigation-forecast')
     st.dataframe(
         predictions,
         width='stretch',

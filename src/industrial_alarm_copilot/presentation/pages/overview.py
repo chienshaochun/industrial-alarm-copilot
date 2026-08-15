@@ -5,6 +5,9 @@ from pathlib import Path
 import plotly.express as px
 import streamlit as st
 
+from industrial_alarm_copilot.presentation.charts import (
+    render_interactive_chart,
+)
 from industrial_alarm_copilot.presentation.data import (
     missing_artifacts,
     required_artifact_paths,
@@ -41,14 +44,23 @@ def render_overview_page() -> None:
         str(paths['incidents']),
     )
 
-    columns = st.columns(5)
+    columns = st.columns(4)
     columns[0].metric('Alarm events', f'{overview.event_count:,}')
     columns[1].metric('Derived episodes', f'{overview.incident_count:,}')
     columns[2].metric('設備', f'{overview.machine_count}')
     columns[3].metric('Alarm codes', f'{overview.alarm_code_count}')
-    columns[4].metric(
-        '資料期間',
-        f'{overview.start_time:%Y-%m} → {overview.end_time:%Y-%m}',
+
+    st.markdown('### 資料涵蓋期間')
+    period_start, period_end = st.columns(2)
+    period_start.metric('資料起點', f'{overview.start_time:%Y-%m-%d}')
+    period_start.caption(f'時間：{overview.start_time:%H:%M:%S.%f}'[:-3])
+    period_end.metric('資料終點', f'{overview.end_time:%Y-%m-%d}')
+    period_end.caption(f'時間：{overview.end_time:%H:%M:%S.%f}'[:-3])
+    st.caption(
+        '完整時間範圍：'
+        f'{overview.start_time:%Y-%m-%d %H:%M:%S.%f}'[:-3]
+        + ' → '
+        + f'{overview.end_time:%Y-%m-%d %H:%M:%S.%f}'[:-3]
     )
 
     st.markdown('### Alarm 活動量')
@@ -59,8 +71,13 @@ def render_overview_page() -> None:
         labels={'month_start': '月份', 'event_count': '事件數'},
         color_discrete_sequence=['#2878b5'],
     )
-    monthly_figure.update_layout(margin=dict(l=0, r=0, t=10, b=0))
-    st.plotly_chart(monthly_figure, width='stretch')
+    monthly_figure.update_traces(
+        hovertemplate=(
+            '<b>%{x|%Y 年 %m 月}</b><br>'
+            'Alarm events：%{y:,}<extra></extra>'
+        )
+    )
+    render_interactive_chart(monthly_figure, key='overview-monthly-events')
 
     left, right = st.columns(2)
     with left:
@@ -73,8 +90,13 @@ def render_overview_page() -> None:
             labels={'event_count': '事件數', 'alarm_code': 'Alarm code'},
             color_discrete_sequence=['#2878b5'],
         )
-        alarm_figure.update_layout(margin=dict(l=0, r=0, t=10, b=0))
-        st.plotly_chart(alarm_figure, width='stretch')
+        alarm_figure.update_traces(
+            hovertemplate=(
+                '<b>Alarm code %{y}</b><br>'
+                '事件數：%{x:,}<extra></extra>'
+            )
+        )
+        render_interactive_chart(alarm_figure, key='overview-top-alarms')
     with right:
         st.markdown('### 各設備 Alarm 量')
         machine_figure = px.bar(
@@ -84,8 +106,13 @@ def render_overview_page() -> None:
             labels={'machine_id': '設備', 'event_count': '事件數'},
             color_discrete_sequence=['#e58b35'],
         )
-        machine_figure.update_layout(margin=dict(l=0, r=0, t=10, b=0))
-        st.plotly_chart(machine_figure, width='stretch')
+        machine_figure.update_traces(
+            hovertemplate=(
+                '<b>設備 %{x}</b><br>'
+                'Alarm events：%{y:,}<extra></extra>'
+            )
+        )
+        render_interactive_chart(machine_figure, key='overview-machine-events')
 
     st.markdown('### Chronological split')
     st.dataframe(
