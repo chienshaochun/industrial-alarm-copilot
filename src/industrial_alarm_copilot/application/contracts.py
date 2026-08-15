@@ -114,3 +114,20 @@ class InvestigationResult:
     retrieved_evidence: tuple[RetrievedEpisodeEvidence, ...]
     predictions: tuple[ForecastPrediction, ...]
     limitations: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class EpisodeOption:
+    '''Compact episode metadata used by UI selectors.'''
+
+    incident_id: str
+    machine_id: str
+    split: str
+    start_time: datetime
+    end_time: datetime
+    event_count: int
+    is_upper_tail: bool
+
+    def __post_init__(self) -> None:
+        if self.event_count < 1:
+            raise ValueError('event_count must be positive')
